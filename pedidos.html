@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrar · LambeLove</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="login-shell">
+  <div class="login-card">
+    <img src="/img/logo.png" class="login-logo" alt="LambeLove">
+    <h1>LambeLove</h1>
+    <p class="lead">Painel de pedidos e comissões. Entre com seu usuário.</p>
+
+    <div class="login-error" id="loginError"></div>
+
+    <form id="formLogin" style="text-align:left;">
+      <label class="form-label">Usuário</label>
+      <input type="text" class="form-control" id="nomeUsuario" autocomplete="username" style="margin-bottom:14px;" required>
+
+      <label class="form-label">Senha</label>
+      <input type="password" class="form-control" id="senha" autocomplete="current-password" style="margin-bottom:20px;" required>
+
+      <button type="submit" class="btn-brand" style="width:100%;" id="btnEntrar">
+        <i class="fa-solid fa-right-to-bracket"></i> Entrar
+      </button>
+    </form>
+    <p style="font-size:11.5px; color:var(--ink-soft); margin-top:18px; text-align:center;">
+      Os usuários iniciais são criados automaticamente no primeiro acesso, com senha criptografada (BCrypt).
+    </p>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script>
+  // Se já está logado, vai direto pro dashboard.
+  if (getToken() && getUsuario()) window.location.href = '/dashboard.html';
+
+  document.getElementById('formLogin').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const erroBox = document.getElementById('loginError');
+    erroBox.style.display = 'none';
+    const btn = document.getElementById('btnEntrar');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Entrando...';
+
+    try {
+      const data = await api('auth', {
+        method: 'POST',
+        body: {
+          nome_usuario: document.getElementById('nomeUsuario').value.trim(),
+          senha: document.getElementById('senha').value,
+        },
+      });
+      localStorage.setItem('crm_token', data.token);
+      localStorage.setItem('crm_usuario', JSON.stringify(data.usuario));
+      window.location.href = '/dashboard.html';
+    } catch (err) {
+      erroBox.textContent = err.message || 'Usuário ou senha inválidos.';
+      erroBox.style.display = 'block';
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Entrar';
+    }
+  });
+</script>
+</body>
+</html>

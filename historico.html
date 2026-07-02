@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Novo Pedido · Comercial B2B</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap-grid.min.css">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-shell" id="shell"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/masks.js"></script>
+<script src="/js/produto.js"></script>
+<script>
+const usuario = protegerPagina();
+const idEdicao = new URLSearchParams(location.search).get('id');
+let freteBrutoAtual = 0; // cotação real recebida do Melhor Envio (sem aplicar política de cobrança)
+let clienteIdAtual = null, statusAtual = null;
+
+if (usuario) {
+  document.getElementById('shell').innerHTML = `
+    ${montarShell('novo-pedido', usuario)}
+    <main class="main">
+      ${montarTopbar(idEdicao ? 'Editar Pedido' : 'Novo Pedido', 'Preencha os dados do cliente e do pedido')}
+      <div class="content">
+        <form id="formPedido" class="card"><div class="card-body">
+
+          <div class="form-section-title"><i class="fa-solid fa-building"></i> Dados da Empresa</div>
+          <div class="row g-3">
+            <div class="col-md-6" style="position:relative;">
+              <label class="form-label">Nome da Empresa *</label>
+              <input class="form-control" id="nome_empresa" required autocomplete="off">
+              <div id="clienteSugestoes" class="cliente-sugestoes" style="display:none;"></div>
+            </div>
+            <div class="col-md-3"><label class="form-label">CNPJ</label><input class="form-control" id="cnpj" placeholder="00.000.000/0000-00"></div>
+            <div class="col-md-3"><label class="form-label">Inscrição Estadual</label><input class="form-control" id="inscricao_estadual"></div>
+            <div class="col-md-4"><label class="form-label">Nome do Sócio</label><input class="form-control" id="nome_socio"></div>
+            <div class="col-md-4"><label class="form-label">Telefone</label><input class="form-control" id="telefone" placeholder="(00) 00000-0000"></div>
+            <div class="col-md-4"><label class="form-label">WhatsApp</label><input class="form-control" id="whatsapp" placeholder="(00) 00000-0000"></div>
+            <div class="col-md-6"><label class="form-label">E-mail</label><input type="email" class="form-control" id="email"></div>
+          </div>
+
+          <div class="form-section-title"><i class="fa-solid fa-location-dot"></i> Endereço</div>
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">CEP</label>
+              <input class="form-control" id="cep" placeholder="00000-000">
+              <div id="cepStatus" style="font-size:11.5px; color:var(--ink-soft); margin-top:4px;"></div>
+            </div>
+            <div class="col-md-6"><label class="form-label">Endereço</label><input class="form-control" id="endereco"></div>
+            <div class="col-md-3"><label class="form-label">Número</label><input class="form-control" id="numero"></div>
+            <div class="col-md-4"><label class="form-label">Complemento</label><input class="form-control" id="complemento"></div>
+            <div class="col-md-4"><label class="form-label">Bairro</label><input class="form-control" id="bairro"></div>
+            <div class="col-md-3"><label class="form-label">Cidade</label><input class="form-control" id="cidade"></div>
+            <div class="col-md-1"><label class="form-label">UF</label><input class="form-control" id="estado" maxlength="2"></div>
+          </div>
+
+          <div class="form-section-title"><i class="fa-solid fa-cart-shopping"></i> Produto</div>
+          <div class="row g-3">
+            <div class="col-12">
+              <div class="product-card selected" id="produtoCard">
+                <img src="/img/logo.png" alt="produto">
+                <div class="product-info">
+                  <div class="product-name" id="produtoNome"></div>
+                  <div class="product-suggestion">Preço: <strong id="produtoSugestao"></strong> (pode ir até <strong id="produtoMaximo"></strong>)</div>
+                </div>
+                <i class="fa-solid fa-circle-check product-check"></i>
+              </div>
+              <input type="hidden" id="produtos">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Quantidade (mín. <span id="qtdMinimaLabel"></span>) *</label>
+              <input type="number" class="form-control" id="quantidade" required>
+              <div id="quantidadeAviso" style="font-size:11.5px; color:var(--coral); margin-top:4px; display:none;">Quantidade mínima é 30 unidades.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Preço Unitário (R$) *</label>
+              <input class="form-control" id="preco_unitario" required>
+              <div id="precoAviso" style="font-size:11.5px; color:var(--coral); margin-top:4px; display:none;">Preço deve ficar entre R$ 59,00 e R$ 89,00.</div>
+            </div>
+            <div class="col-md-3"><label class="form-label">Valor Total (R$)</label><input class="form-control" id="valor_total" readonly style="background:var(--bg-soft, #f4f4f4);"></div>
+            <div class="col-md-3">
+              <label class="form-label">Forma de Pagamento *</label>
+              <select class="form-select" id="forma_pagamento" required>
+                <option value="">Selecione</option>
+                <option value="PIX">PIX</option>
+                <option value="TRANSFERENCIA">Transferência</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-section-title"><i class="fa-solid fa-truck"></i> Frete</div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <button type="button" class="btn-outline" id="btnCalcularFrete"><i class="fa-solid fa-calculator"></i> Calcular Frete</button>
+            </div>
+            <div class="col-md-4" id="colPoliticaFrete" style="display:none;">
+              <label class="form-label">Cobrança do Frete (Admin)</label>
+              <select class="form-select" id="politicaFrete">
+                <option value="1">Cobrar Integral (100%)</option>
+                <option value="0.5">Cobrar Metade (50%)</option>
+                <option value="0">Não Cobrar (Grátis)</option>
+              </select>
+              <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">Sugestão automática (frete até 5% do pedido = grátis, 5-10% = metade, acima = integral). Pode trocar manualmente.</div>
+            </div>
+            <div class="col-md-4"><label class="form-label">Frete Cobrado do Cliente (R$)</label><input class="form-control" id="valor_frete" readonly value="0,00" style="background:var(--bg-soft, #f4f4f4);"></div>
+            <div class="col-md-4"><label class="form-label">Total Geral (produto + frete)</label><input class="form-control" id="totalGeral" readonly value="0,00" style="background:var(--bg-soft, #f4f4f4); font-weight:700;"></div>
+            <div class="col-12" id="freteOpcoes" style="display:none;"></div>
+            <div class="col-12" id="freteStatus" style="font-size:12px; color:var(--ink-soft);"></div>
+          </div>
+
+          <div class="form-section-title"><i class="fa-solid fa-note-sticky"></i> Observações</div>
+          <div class="row g-3">
+            <div class="col-12"><textarea class="form-control" id="observacoes" rows="2" placeholder="Observações do pedido"></textarea></div>
+          </div>
+
+          <div style="margin-top:24px; display:flex; gap:10px;">
+            <button type="submit" class="btn-brand" id="btnSalvar"><i class="fa-solid fa-floppy-disk"></i> Salvar Pedido</button>
+            <a href="/pedidos.html" class="btn-outline" style="text-decoration:none; display:inline-flex; align-items:center;">Cancelar</a>
+          </div>
+
+        </div></form>
+      </div>
+    </main>`;
+
+  document.getElementById('formPedido').addEventListener('submit', salvarPedido);
+  document.getElementById('btnCalcularFrete').addEventListener('click', calcularFrete);
+
+  aplicarMascaraEmTempoReal(document.getElementById('cnpj'), mascararCnpj);
+  aplicarMascaraEmTempoReal(document.getElementById('telefone'), mascararTelefone);
+  aplicarMascaraEmTempoReal(document.getElementById('whatsapp'), mascararTelefone);
+  aplicarMascaraEmTempoReal(document.getElementById('preco_unitario'), mascararMoeda);
+  configurarCep();
+  configurarProduto();
+  configurarAutocompleteCliente();
+
+  const colPolitica = document.getElementById('colPoliticaFrete');
+  const politicaEl = document.getElementById('politicaFrete');
+  if (usuario.perfil === 'ADMIN' && colPolitica && politicaEl) {
+    colPolitica.style.display = 'block';
+    politicaEl.addEventListener('change', aplicarPoliticaFrete);
+  }
+
+  if (idEdicao) carregarPedidoParaEdicao(idEdicao);
+}
+
+function configurarProduto() {
+  document.getElementById('produtos').value = PRODUTO.nome;
+  document.getElementById('produtoNome').textContent = PRODUTO.nome;
+  document.getElementById('produtoSugestao').textContent = 'R$ ' + PRODUTO.preco_padrao.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+  document.getElementById('produtoMaximo').textContent = 'R$ ' + PRODUTO.preco_maximo.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+  document.getElementById('qtdMinimaLabel').textContent = PRODUTO.quantidade_minima;
+
+  const qtdInput = document.getElementById('quantidade');
+  const precoInput = document.getElementById('preco_unitario');
+  qtdInput.value = PRODUTO.quantidade_minima;
+  precoInput.value = PRODUTO.preco_padrao.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+  qtdInput.addEventListener('input', () => { validarQuantidade(); recalcularValores(); });
+  precoInput.addEventListener('input', () => { validarPreco(); recalcularValores(); });
+  document.getElementById('cep').addEventListener('input', limparFrete);
+
+  recalcularValores();
+}
+
+function validarQuantidade() {
+  const qtdInput = document.getElementById('quantidade');
+  const aviso = document.getElementById('quantidadeAviso');
+  const invalida = Number(qtdInput.value) < PRODUTO.quantidade_minima;
+  aviso.style.display = invalida ? 'block' : 'none';
+  return !invalida;
+}
+
+function validarPreco() {
+  const precoInput = document.getElementById('preco_unitario');
+  const aviso = document.getElementById('precoAviso');
+  const preco = moedaParaNumero(precoInput.value) || 0;
+  const invalido = preco < PRODUTO.preco_minimo || preco > PRODUTO.preco_maximo;
+  aviso.style.display = invalido ? 'block' : 'none';
+  return !invalido;
+}
+
+function recalcularValores() {
+  const qtd = Number(document.getElementById('quantidade').value) || 0;
+  const preco = moedaParaNumero(document.getElementById('preco_unitario').value) || 0;
+  const total = qtd * preco;
+  document.getElementById('valor_total').value = total.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+  atualizarTotalGeral();
+  limparFrete();
+}
+
+function atualizarTotalGeral() {
+  const total = moedaParaNumero(document.getElementById('valor_total').value) || 0;
+  const frete = moedaParaNumero(document.getElementById('valor_frete').value) || 0;
+  document.getElementById('totalGeral').value = (total + frete).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+}
+
+function limparFrete() {
+  freteBrutoAtual = 0;
+  document.getElementById('valor_frete').value = '0,00';
+  document.getElementById('freteOpcoes').style.display = 'none';
+  document.getElementById('freteOpcoes').innerHTML = '';
+  document.getElementById('freteStatus').textContent = '';
+  atualizarTotalGeral();
+}
+
+async function calcularFrete() {
+  const cep = document.getElementById('cep').value.replace(/\D/g, '');
+  const qtd = Number(document.getElementById('quantidade').value) || 0;
+  const status = document.getElementById('freteStatus');
+  const opcoesBox = document.getElementById('freteOpcoes');
+
+  if (cep.length !== 8) { status.textContent = 'Informe um CEP válido do cliente antes de calcular o frete.'; return; }
+
+  const btn = document.getElementById('btnCalcularFrete');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Calculando...';
+  status.textContent = '';
+  opcoesBox.style.display = 'none';
+  opcoesBox.innerHTML = '';
+
+  try {
+    const opcoes = await api('frete', { method: 'POST', body: { cep_destino: cep, quantidade: qtd } });
+    if (!opcoes || !opcoes.length) {
+      status.textContent = 'Nenhuma opção de frete encontrada para este CEP.';
+    } else {
+      opcoesBox.style.display = 'block';
+      opcoesBox.innerHTML = opcoes.map((o, i) => `
+        <label class="frete-opcao">
+          <input type="radio" name="freteOpcao" value="${o.preco}" ${i === 0 ? 'checked' : ''} onchange="selecionarFrete(${o.preco})">
+          <span><strong>${o.transportadora} - ${o.servico}</strong> · R$ ${o.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} · até ${o.prazo_dias} dia(s)</span>
+        </label>`).join('');
+      selecionarFrete(opcoes[0].preco);
+    }
+  } catch (err) {
+    status.textContent = 'Não foi possível calcular o frete agora: ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-calculator"></i> Calcular Frete';
+  }
+}
+
+function selecionarFrete(valor) {
+  freteBrutoAtual = Number(valor);
+
+  // Regra automática: sugere a cobrança com base no % do frete sobre o valor do pedido.
+  // Até 5% => grátis · 5% a 10% => metade · acima de 10% => integral.
+  // O administrador pode trocar manualmente depois, se quiser.
+  const politicaEl = document.getElementById('politicaFrete');
+  if (politicaEl) {
+    const valorTotal = moedaParaNumero(document.getElementById('valor_total').value) || 0;
+    const percentual = valorTotal > 0 ? (freteBrutoAtual / valorTotal) : 1;
+    politicaEl.value = percentual <= 0.05 ? '0' : (percentual <= 0.10 ? '0.5' : '1');
+  }
+
+  aplicarPoliticaFrete();
+}
+
+function aplicarPoliticaFrete() {
+  const politicaEl = document.getElementById('politicaFrete');
+  const multiplicador = politicaEl ? Number(politicaEl.value) : 1;
+  const freteCobrado = freteBrutoAtual * multiplicador;
+  document.getElementById('valor_frete').value = freteCobrado.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+  atualizarTotalGeral();
+}
+
+function configurarCep() {
+  const cepInput = document.getElementById('cep');
+  aplicarMascaraEmTempoReal(cepInput, mascararCep);
+  cepInput.addEventListener('blur', async () => {
+    const status = document.getElementById('cepStatus');
+    const limpo = cepInput.value.replace(/\D/g, '');
+    if (limpo.length !== 8) return;
+    status.textContent = 'Buscando endereço...';
+    const dados = await consultarCep(cepInput.value);
+    if (dados) {
+      document.getElementById('endereco').value = dados.endereco || '';
+      document.getElementById('bairro').value = dados.bairro || '';
+      document.getElementById('cidade').value = dados.cidade || '';
+      document.getElementById('estado').value = dados.estado || '';
+      status.textContent = 'Endereço preenchido automaticamente (ViaCEP).';
+      document.getElementById('numero').focus();
+    } else {
+      status.textContent = 'CEP não encontrado. Preencha manualmente.';
+    }
+  });
+}
+
+function configurarAutocompleteCliente() {
+  const input = document.getElementById('nome_empresa');
+  const box = document.getElementById('clienteSugestoes');
+  let debounceId;
+
+  input.addEventListener('input', () => {
+    clienteIdAtual = null; // digitou de novo: deixa de estar "vinculado" a um cliente já salvo
+    clearTimeout(debounceId);
+    const termo = input.value.trim();
+    if (termo.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    debounceId = setTimeout(() => buscarClientesAutocomplete(termo), 300);
+  });
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => { box.style.display = 'none'; }, 150); // dá tempo do onclick do item disparar antes de esconder
+  });
+}
+
+async function buscarClientesAutocomplete(termo) {
+  const box = document.getElementById('clienteSugestoes');
+  try {
+    const lista = await api('clientes?busca=' + encodeURIComponent(termo) + '&limite=8');
+    if (!lista.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.innerHTML = lista.map((c) => `
+      <div class="item" onclick='selecionarClienteAutocomplete(${JSON.stringify(c).replace(/'/g, "&#39;")})'>
+        ${c.nome_empresa}
+        <small>${[c.cnpj, c.cidade ? c.cidade + '/' + (c.estado || '') : null].filter(Boolean).join(' · ') || 'Sem CNPJ/cidade cadastrado'}</small>
+      </div>`).join('');
+    box.style.display = 'block';
+  } catch {
+    box.style.display = 'none';
+  }
+}
+
+function selecionarClienteAutocomplete(c) {
+  const campos = ['nome_empresa', 'cnpj', 'inscricao_estadual', 'nome_socio', 'telefone', 'whatsapp', 'email',
+    'cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado'];
+  campos.forEach((campo) => { const el = document.getElementById(campo); if (el) el.value = c[campo] ?? ''; });
+  clienteIdAtual = c.id;
+  document.getElementById('clienteSugestoes').style.display = 'none';
+  toast('Dados do cliente preenchidos automaticamente.', 'success');
+}
+
+async function carregarPedidoParaEdicao(id) {
+  try {
+    const p = await api('pedidos', { params: { id } });
+    if (!['AGUARDANDO_APROVACAO'].includes(p.status) && usuario.perfil !== 'ADMIN') {
+      toast('Este pedido já foi avaliado e não pode mais ser editado.', 'error');
+      window.location.href = '/pedidos.html';
+      return;
+    }
+    clienteIdAtual = p.cliente_id;
+    statusAtual = p.status;
+    const campos = ['nome_empresa','cnpj','inscricao_estadual','nome_socio','telefone','whatsapp','email','cep','endereco','numero','complemento','bairro','cidade','estado','produtos','quantidade','observacoes'];
+    campos.forEach((c) => { if (document.getElementById(c)) document.getElementById(c).value = p[c] ?? ''; });
+    document.getElementById('valor_total').value = Number(p.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    document.getElementById('valor_frete').value = Number(p.valor_frete || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    freteBrutoAtual = Number(p.valor_frete || 0); // ao reabrir, considera o valor salvo como base (política Integral)
+    const precoUnit = p.quantidade ? (Number(p.valor_total) / Number(p.quantidade)) : PRODUTO.preco_padrao;
+    document.getElementById('preco_unitario').value = precoUnit.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    document.getElementById('forma_pagamento').value = p.forma_pagamento;
+    validarQuantidade();
+    atualizarTotalGeral();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function salvarPedido(e) {
+  e.preventDefault();
+
+  // Quantidade e preço mostram um aviso visual (ver validarQuantidade/validarPreco),
+  // mas não bloqueiam o envio — são apenas sugestões para a vendedora.
+  validarQuantidade();
+  validarPreco();
+
+  const btn = document.getElementById('btnSalvar');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...';
+
+  const payload = {
+    cliente_id: clienteIdAtual || undefined,
+    nome_empresa: val('nome_empresa'), cnpj: val('cnpj'), inscricao_estadual: val('inscricao_estadual'),
+    nome_socio: val('nome_socio'), telefone: val('telefone'), whatsapp: val('whatsapp'), email: val('email'),
+    cep: val('cep'), endereco: val('endereco'), numero: val('numero'), complemento: val('complemento'),
+    bairro: val('bairro'), cidade: val('cidade'), estado: val('estado'),
+    produtos: val('produtos'), quantidade: Number(val('quantidade')),
+    valor_total: moedaParaNumero(val('valor_total')),
+    valor_frete: moedaParaNumero(val('valor_frete')) || 0,
+    forma_pagamento: val('forma_pagamento'), observacoes: val('observacoes'),
+  };
+
+  try {
+    if (idEdicao) {
+      payload.id = idEdicao;
+      payload.cliente_id = clienteIdAtual;
+      await api('pedidos', { method: 'PUT', body: payload });
+      toast('Pedido atualizado com sucesso!');
+    } else {
+      await api('pedidos', { method: 'POST', body: payload });
+      toast('Pedido cadastrado com sucesso!');
+    }
+    setTimeout(() => window.location.href = '/pedidos.html', 600);
+  } catch (err) {
+    toast(err.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Salvar Pedido';
+  }
+}
+
+function val(id) { return document.getElementById(id).value.trim(); }
+</script>
+</body>
+</html>
