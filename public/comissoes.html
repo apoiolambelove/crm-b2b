@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comissões · LambeLove</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap-grid.min.css">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-shell" id="shell"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script>
+const usuario = protegerPagina();
+const MESES_NOMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+if (usuario) {
+  document.getElementById('shell').innerHTML = `
+    ${montarShell('comissoes', usuario)}
+    <main class="main">
+      ${montarTopbar('Comissões', 'Lançamento e confirmação de pagamento de comissões')}
+      <div class="content">
+
+        <div id="areaAceite"></div>
+
+        ${usuario.perfil === 'ADMIN' ? `
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-body">
+            <h3 style="font-size:15px; margin-top:0;">Lançar Pagamento</h3>
+            <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-6px;">Selecione as vendas concluídas ainda não pagas e lance o pagamento. A vendedora precisa confirmar o recebimento para o valor sair de "a receber".</p>
+            <div class="row g-3" style="margin-bottom:12px;">
+              <div class="col-md-3"><label class="form-label">Período - Início</label><input type="date" class="form-control" id="periodoInicio"></div>
+              <div class="col-md-3"><label class="form-label">Período - Fim</label><input type="date" class="form-control" id="periodoFim"></div>
+              <div class="col-md-3" style="align-self:flex-end;">
+                <button class="btn-brand" id="btnLancar" onclick="lancarPagamento()" disabled><i class="fa-solid fa-paper-plane"></i> Lançar Pagamento (<span id="qtdSelecionados">0</span>)</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th></th><th>Nº</th><th>Data</th><th>Empresa</th><th>Vendedora</th><th>Comissão</th></tr></thead>
+                <tbody id="corpoPendentes"><tr><td colspan="6" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>` : ''}
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-body">
+            <h3 style="font-size:15px; margin-top:0;">Resumo Mensal</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Mês</th><th>Pago</th><th>A Receber (Concluídas)</th><th>Futuras (Não Concluídas)</th></tr></thead>
+                <tbody id="corpoResumo"><tr><td colspan="4" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <h3 style="font-size:15px; margin-top:0;">Histórico de Pagamentos</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Período</th>${usuario.perfil === 'ADMIN' ? '<th>Vendedora</th>' : ''}<th>Valor</th><th>Status</th><th>Lançado em</th><th>Confirmado em</th></tr></thead>
+                <tbody id="corpoHistorico"><tr><td colspan="6" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>`;
+
+  carregarAceitePendente();
+  carregarResumoMensal();
+  carregarHistorico();
+  if (usuario.perfil === 'ADMIN') carregarPendentes();
+}
+
+function formatarMoeda(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
+function formatarDataBR(d) { if (!d) return '-'; const [a, m, dia] = d.split('-'); return `${dia}/${m}/${a}`; }
+function formatarDataHora(iso) { if (!iso) return '-'; return new Date(iso).toLocaleString('pt-BR'); }
+
+// ---------- Aceite da vendedora ----------
+async function carregarAceitePendente() {
+  const area = document.getElementById('areaAceite');
+  try {
+    const lista = await api('comissoes?aguardando=1');
+    if (!lista.length) return;
+    area.innerHTML = lista.map((p) => `
+      <div class="card" style="margin-bottom:16px; border-color:var(--amber);">
+        <div class="card-body" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+          <div>
+            <strong style="font-size:15px;"><i class="fa-solid fa-hand-holding-dollar" style="color:var(--amber);"></i> Pagamento aguardando sua confirmação</strong>
+            <div style="font-size:13px; color:var(--ink-soft); margin-top:4px;">
+              Período: ${formatarDataBR(p.periodo_inicio)} a ${formatarDataBR(p.periodo_fim)} &nbsp;·&nbsp; Valor: <strong>${formatarMoeda(p.valor_total)}</strong>
+            </div>
+          </div>
+          <button class="btn-brand" onclick="confirmarRecebimento('${p.id}')"><i class="fa-solid fa-check"></i> Confirmar Recebimento</button>
+        </div>
+      </div>`).join('');
+  } catch { area.innerHTML = ''; }
+}
+
+async function confirmarRecebimento(id) {
+  if (!confirm('Confirmar que você recebeu esse pagamento? Essa ação não pode ser desfeita.')) return;
+  try {
+    await api('comissoes', { method: 'PUT', body: { id } });
+    toast('Recebimento confirmado!', 'success');
+    carregarAceitePendente();
+    carregarHistorico();
+    carregarResumoMensal();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ---------- Pendentes de pagamento (Admin) ----------
+let pendentesSelecionados = new Set();
+
+async function carregarPendentes() {
+  const corpo = document.getElementById('corpoPendentes');
+  try {
+    const lista = await api('comissoes?pendentes=1');
+    if (!lista.length) {
+      corpo.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-circle-check"></i>Nenhuma comissão pendente de pagamento. Tudo certo!</div></td></tr>`;
+      return;
+    }
+    corpo.innerHTML = lista.map((p) => `
+      <tr>
+        <td><input type="checkbox" class="chkPendente" value="${p.id}" data-vendedora="${p.criado_por}" data-comissao="${p.valor_comissao}" onchange="atualizarSelecionados()"></td>
+        <td class="num">#${p.numero_pedido}</td>
+        <td>${formatarDataBR(p.data_pedido)}</td>
+        <td>${p.nome_empresa}</td>
+        <td>${p.criado_por_nome || '-'}</td>
+        <td class="num">${formatarMoeda(p.valor_comissao)}</td>
+      </tr>`).join('');
+  } catch (err) {
+    corpo.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
+  }
+}
+
+function atualizarSelecionados() {
+  const checks = document.querySelectorAll('.chkPendente:checked');
+  pendentesSelecionados = new Set([...checks].map((c) => c.value));
+  document.getElementById('qtdSelecionados').textContent = pendentesSelecionados.size;
+  document.getElementById('btnLancar').disabled = pendentesSelecionados.size === 0;
+}
+
+async function lancarPagamento() {
+  const checks = [...document.querySelectorAll('.chkPendente:checked')];
+  if (!checks.length) return;
+
+  const vendedoras = new Set(checks.map((c) => c.dataset.vendedora));
+  if (vendedoras.size > 1) {
+    toast('Selecione pedidos de apenas uma vendedora por vez.', 'error');
+    return;
+  }
+
+  const periodoInicio = document.getElementById('periodoInicio').value;
+  const periodoFim = document.getElementById('periodoFim').value;
+  if (!periodoInicio || !periodoFim) {
+    toast('Informe o período do pagamento.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btnLancar');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Lançando...';
+
+  try {
+    await api('comissoes', {
+      method: 'POST',
+      body: {
+        vendedora_id: [...vendedoras][0],
+        pedido_ids: checks.map((c) => c.value),
+        periodo_inicio: periodoInicio,
+        periodo_fim: periodoFim,
+      },
+    });
+    toast('Pagamento lançado! A vendedora vai ver o aviso de confirmação no próximo acesso.', 'success');
+    carregarPendentes();
+    carregarHistorico();
+    carregarResumoMensal();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Lançar Pagamento (<span id="qtdSelecionados">0</span>)';
+    atualizarSelecionados();
+  }
+}
+
+// ---------- Resumo mensal ----------
+async function carregarResumoMensal() {
+  const corpo = document.getElementById('corpoResumo');
+  try {
+    const lista = await api('comissoes?resumo=1');
+    if (!lista.length) {
+      corpo.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Sem dados ainda.</div></td></tr>`;
+      return;
+    }
+    corpo.innerHTML = lista.map((m) => {
+      const [ano, mes] = m.mes.split('-');
+      return `<tr>
+        <td>${MESES_NOMES[Number(mes) - 1]}/${ano}</td>
+        <td class="num" style="color:var(--primary); font-weight:600;">${formatarMoeda(m.pago)}</td>
+        <td class="num">${formatarMoeda(m.aReceber)}</td>
+        <td class="num" style="color:var(--ink-soft);">${formatarMoeda(m.futuras)}</td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    corpo.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
+  }
+}
+
+// ---------- Histórico ----------
+async function carregarHistorico() {
+  const corpo = document.getElementById('corpoHistorico');
+  const colspan = usuario.perfil === 'ADMIN' ? 6 : 5;
+  try {
+    const lista = await api('comissoes?historico=1');
+    if (!lista.length) {
+      corpo.innerHTML = `<tr><td colspan="${colspan}"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Nenhum pagamento lançado ainda.</div></td></tr>`;
+      return;
+    }
+    corpo.innerHTML = lista.map((p) => `
+      <tr>
+        <td>${formatarDataBR(p.periodo_inicio)} a ${formatarDataBR(p.periodo_fim)}</td>
+        ${usuario.perfil === 'ADMIN' ? `<td>${p.usuarios?.nome_completo || '-'}</td>` : ''}
+        <td class="num">${formatarMoeda(p.valor_total)}</td>
+        <td>${p.status === 'ACEITO' ? '<span class="badge-status st-concluida">Pago (Confirmado)</span>' : '<span class="badge-status st-aguardando">Aguardando Confirmação</span>'}</td>
+        <td>${formatarDataHora(p.criado_em)}</td>
+        <td>${formatarDataHora(p.aceito_em)}</td>
+      </tr>`).join('');
+  } catch (err) {
+    corpo.innerHTML = `<tr><td colspan="${colspan}"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
+  }
+}
+</script>
+</body>
+</html>

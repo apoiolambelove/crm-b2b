@@ -114,6 +114,25 @@ create index if not exists idx_historico_pedido on historico (pedido_id);
 create index if not exists idx_historico_data on historico (criado_em);
 
 -- ---------------------------------------------------------
+-- PAGAMENTOS DE COMISSÃO (lançamento pelo Admin + aceite da Vendedora)
+-- ---------------------------------------------------------
+create table if not exists pagamentos_comissao (
+  id uuid primary key default gen_random_uuid(),
+  vendedora_id uuid not null references usuarios(id),
+  periodo_inicio date not null,
+  periodo_fim date not null,
+  valor_total numeric(12,2) not null default 0,
+  status text not null default 'AGUARDANDO_ACEITE' check (status in ('AGUARDANDO_ACEITE', 'ACEITO')),
+  criado_por uuid references usuarios(id),
+  criado_em timestamptz not null default now(),
+  aceito_em timestamptz
+);
+
+alter table pedidos add column if not exists pagamento_comissao_id uuid references pagamentos_comissao(id) on delete set null;
+
+alter table pagamentos_comissao enable row level security;
+
+-- ---------------------------------------------------------
 -- VIEW: pedidos com dados do cliente (facilita consultas)
 -- ---------------------------------------------------------
 create or replace view vw_pedidos as

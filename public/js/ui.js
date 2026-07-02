@@ -75,6 +75,7 @@ function montarShell(paginaAtiva, usuario) {
     { id: 'pedidos', href: '/pedidos.html', icon: 'fa-list-check', label: 'Pedidos' },
     { id: 'clientes', href: '/clientes.html', icon: 'fa-address-book', label: 'Clientes' },
     { id: 'relatorios', href: '/relatorios.html', icon: 'fa-chart-column', label: 'Relatório Mensal' },
+    { id: 'comissoes', href: '/comissoes.html', icon: 'fa-hand-holding-dollar', label: 'Comissões' },
   ];
   if (isAdmin) links.push({ id: 'historico', href: '/historico.html', icon: 'fa-clock-rotate-left', label: 'Histórico' });
   if (isAdmin) links.push({ id: 'usuarios', href: '/usuarios.html', icon: 'fa-users-gear', label: 'Usuários' });
