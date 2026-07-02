@@ -276,6 +276,17 @@ tbody tr:hover{background:var(--primary-soft);}
 .cliente-sugestoes .item:last-child{ border-bottom:none; }
 .cliente-sugestoes .item:hover{ background:rgba(0,0,0,.04); }
 .cliente-sugestoes .item small{ display:block; color:var(--ink-soft); font-size:11px; }
+
+/* ---------- Banner de saudação (Dashboard) ---------- */
+.greeting-banner{
+  display:flex; align-items:center; gap:14px;
+  background:linear-gradient(135deg, var(--primary-soft), var(--bg-elevated));
+  border:1px solid var(--line); border-radius:12px;
+  padding:16px 20px; margin-bottom:22px;
+}
+.greeting-banner i{ font-size:22px; color:var(--amber); }
+.greeting-banner strong{ font-size:15px; display:block; margin-bottom:2px; }
+.greeting-banner div div{ font-size:13px; color:var(--ink-soft); }
 .login-card h1{font-size:21px; margin:0 0 4px;}
 .login-card p.lead{color:var(--ink-soft); font-size:13px; margin:0 0 24px;}
 .login-error{

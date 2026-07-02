@@ -20,11 +20,46 @@ if (usuario) {
     ${montarShell('dashboard', usuario)}
     <main class="main">
       ${montarTopbar('Dashboard', 'Panorama geral dos pedidos e comissões')}
-      <div class="content" id="conteudo">
-        <div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando indicadores...</div>
+      <div class="content">
+        <div class="greeting-banner">
+          <i class="fa-solid ${saudacaoIcone()}"></i>
+          <div>
+            <strong>${saudacaoTexto()}, ${primeiroNome(usuario)}!</strong>
+            <div>${saudacaoMensagem()}</div>
+          </div>
+        </div>
+        <div id="conteudo">
+          <div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando indicadores...</div>
+        </div>
       </div>
     </main>`;
   carregarDashboard();
+}
+
+function primeiroNome(u) {
+  const nome = u.nome_completo || u.nome_usuario || '';
+  return nome.split(' ')[0];
+}
+
+function saudacaoTexto() {
+  const hora = new Date().getHours();
+  if (hora < 12) return 'Bom dia';
+  if (hora < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+function saudacaoIcone() {
+  const hora = new Date().getHours();
+  if (hora < 12) return 'fa-mug-hot';
+  if (hora < 18) return 'fa-sun';
+  return 'fa-moon';
+}
+
+function saudacaoMensagem() {
+  const hora = new Date().getHours();
+  if (hora < 12) return 'Tenha um excelente dia de trabalho!';
+  if (hora < 18) return 'Continue com o ótimo trabalho, você está indo muito bem!';
+  return 'Fecha o dia com chave de ouro. Depois, descanse bem!';
 }
 
 async function carregarDashboard() {
