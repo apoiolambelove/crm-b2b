@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relatório Mensal · Comercial B2B</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="/css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+<div class="app-shell" id="shell"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script>
+const usuario = protegerPagina();
+let relatorioAtual = null;
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+if (usuario) {
+  const hoje = new Date();
+  document.getElementById('shell').innerHTML = `
+    ${montarShell('relatorios', usuario)}
+    <main class="main">
+      ${montarTopbar('Relatório Mensal', 'Selecione o mês e o ano para consolidar os resultados')}
+      <div class="content">
+        <div class="filters-bar">
+          <select class="form-select" id="fMes">${MESES.map((m, i) => `<option value="${i+1}" ${i+1 === hoje.getMonth()+1 ? 'selected' : ''}>${m}</option>`).join('')}</select>
+          <input type="number" class="form-control" id="fAno" value="${hoje.getFullYear()}" style="width:100px;">
+          <button class="btn-brand btn-sm" onclick="gerarRelatorio()"><i class="fa-solid fa-magnifying-glass"></i> Gerar</button>
+          <div style="flex:1;"></div>
+          <button class="btn-outline btn-sm" onclick="exportarPDF()"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+          <button class="btn-outline btn-sm" onclick="exportarExcel()"><i class="fa-solid fa-file-excel"></i> Excel</button>
+          <button class="btn-outline btn-sm" onclick="window.print()"><i class="fa-solid fa-print"></i> Imprimir</button>
+        </div>
+        <div id="conteudoRelatorio"><div class="empty-state"><i class="fa-solid fa-chart-column"></i>Selecione um período e clique em Gerar.</div></div>
+      </div>
+    </main>`;
+  gerarRelatorio();
+}
+
+async function gerarRelatorio() {
+  const mes = document.getElementById('fMes').value;
+  const ano = document.getElementById('fAno').value;
+  const box = document.getElementById('conteudoRelatorio');
+  box.innerHTML = `<div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Calculando...</div>`;
+  try {
+    const r = await api('relatorio', { params: { mes, ano } });
+    relatorioAtual = r;
+    box.innerHTML = `
+      <div class="stat-grid" style="grid-template-columns:repeat(4,1fr); margin-bottom:8px;">
+        ${cardStat('Pedidos no Período', r.quantidadePedidos, 'primary')}
+        ${cardStat('Total Vendido', formatarMoeda(r.totalVendido), 'primary')}
+        ${cardStat('Concluídos', r.pedidosConcluidos, 'primary')}
+        ${cardStat('Pendentes', r.pedidosPendentes, 'amber')}
+        ${cardStat('Cancelados / Não Efetivados', r.pedidosCancelados, 'coral')}
+        ${cardStat('Frete Total', formatarMoeda(r.totalFrete || 0), 'neutral')}
+        ${cardStat('Comissão Prevista (Total)', formatarMoeda(r.valorComissoes), 'neutral')}
+        ${cardStat('Comissão a Pagar (Concluídas)', formatarMoeda(r.valorAprovado), 'primary')}
+        ${cardStat('Comissão Futura (Não Confirmada)', formatarMoeda(r.valorPendente), 'amber')}
+      </div>
+      <p style="font-size:12px; color:var(--ink-soft); margin:0 0 20px;">
+        <i class="fa-solid fa-circle-info"></i> A comissão só é <strong>a pagar de fato</strong> quando o pedido estiver "Venda Concluída". Os valores marcados como "futura" são apenas previsão.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nº</th><th>Data</th><th>Empresa</th><th>Valor</th><th>Frete</th><th>Status</th><th>Comissão</th></tr></thead>
+          <tbody>
+            ${r.pedidos.length ? r.pedidos.map((p) => `
+              <tr>
+                <td class="num">#${p.numero_pedido}</td>
+                <td>${formatarDataBR(p.data_pedido)}</td>
+                <td>${p.nome_empresa}</td>
+                <td class="num">${formatarMoeda(p.valor_total)}</td>
+                <td class="num">${formatarMoeda(p.valor_frete || 0)}</td>
+                <td>${badgeStatus(p.status)}</td>
+                <td class="num">${formatarMoeda(p.valor_comissao)} <span style="font-size:10px; color:var(--ink-soft);">${p.comissao_status === 'APROVADA' ? '· a pagar' : '· futura'}</span></td>
+              </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Nenhum pedido neste período.</div></td></tr>`}
+          </tbody>
+        </table>
+      </div>`;
+  } catch (err) {
+    box.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div>`;
+  }
+}
+
+function cardStat(label, value, stripe) {
+  return `<div class="ledger-card stripe-${stripe}"><div class="label">${label}</div><div class="value">${value}</div></div>`;
+}
+
+function carregarLogoBase64() {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } catch { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = '/img/logo.png';
+  });
+}
+
+async function exportarPDF() {
+  if (!relatorioAtual) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const { mes, ano } = relatorioAtual.periodo;
+  const ultimoDia = new Date(ano, mes, 0).getDate();
+  const periodoTexto = `01/${String(mes).padStart(2, '0')}/${ano} a ${String(ultimoDia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${ano}`;
+  const nomeUsuario = usuario.nome_completo || usuario.nome_usuario;
+
+  const logo = await carregarLogoBase64();
+  if (logo) doc.addImage(logo, 'PNG', 14, 8, 20, 20);
+
+  doc.setFontSize(15);
+  doc.text('Relatório de Vendas LambeLove', logo ? 38 : 14, 16);
+  doc.setFontSize(10);
+  doc.setTextColor(90);
+  doc.text(`Período: ${periodoTexto}`, logo ? 38 : 14, 22);
+  doc.text(`Gerado por: ${nomeUsuario}`, logo ? 38 : 14, 27);
+  doc.setTextColor(0);
+
+  doc.setFontSize(10);
+  doc.text(
+    `Total vendido: ${formatarMoeda(relatorioAtual.totalVendido)}   |   Frete: ${formatarMoeda(relatorioAtual.totalFrete || 0)}`,
+    14, 36,
+  );
+  doc.setTextColor(15, 76, 69);
+  doc.text(`Comissão a Receber (Vendas Concluídas): ${formatarMoeda(relatorioAtual.valorAprovado)}`, 14, 42);
+  doc.setTextColor(184, 108, 26);
+  doc.text(`Comissão Pendente (Não Confirmada): ${formatarMoeda(relatorioAtual.valorPendente)}`, 14, 48);
+  doc.setTextColor(0);
+
+  doc.autoTable({
+    startY: 54,
+    head: [['Nº', 'Data', 'Empresa', 'Valor', 'Frete', 'Status', 'Comissão']],
+    body: relatorioAtual.pedidos.map((p) => [
+      p.numero_pedido, formatarDataBR(p.data_pedido), p.nome_empresa,
+      formatarMoeda(p.valor_total), formatarMoeda(p.valor_frete || 0), STATUS_LABEL[p.status],
+      formatarMoeda(p.valor_comissao) + (p.comissao_status === 'APROVADA' ? ' (a receber)' : ' (pendente)'),
+    ]),
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [15, 76, 69] },
+  });
+  doc.save(`relatorio-${mes}-${ano}.pdf`);
+}
+
+function exportarExcel() {
+  if (!relatorioAtual) return;
+  const linhas = relatorioAtual.pedidos.map((p) => ({
+    'Nº Pedido': p.numero_pedido, 'Data': formatarDataBR(p.data_pedido), 'Empresa': p.nome_empresa,
+    'Valor Total': p.valor_total, 'Frete': p.valor_frete || 0, 'Status': STATUS_LABEL[p.status], 'Comissão': p.valor_comissao,
+    'Situação da Comissão': p.comissao_status === 'APROVADA' ? 'A Receber (Venda Concluída)' : 'Pendente (Não Confirmada)',
+  }));
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Relatório');
+  XLSX.writeFile(wb, `relatorio-${relatorioAtual.periodo.mes}-${relatorioAtual.periodo.ano}.xlsx`);
+}
+</script>
+</body>
+</html>

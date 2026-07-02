@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Usuários · Comercial B2B</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-shell" id="shell"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script>
+const usuario = protegerPagina(true); // exige ADMIN
+
+if (usuario) {
+  document.getElementById('shell').innerHTML = `
+    ${montarShell('usuarios', usuario)}
+    <main class="main">
+      ${montarTopbar('Usuários', 'Cadastre novos vendedores/administradores e gerencie senhas')}
+      <div class="content">
+        <div class="section-head">
+          <h2>Equipe</h2>
+          <button class="btn-brand btn-sm" onclick="abrirNovo()"><i class="fa-solid fa-user-plus"></i> Novo Usuário</button>
+        </div>
+        <div class="table-wrap" style="margin-bottom:26px;">
+          <table>
+            <thead><tr><th>Usuário</th><th>Nome</th><th>Perfil</th><th>Status</th><th></th></tr></thead>
+            <tbody id="corpoUsuarios"><tr><td colspan="5" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="card" id="cardForm" style="display:none; max-width:480px;">
+          <div class="card-body">
+            <h3 id="tituloForm" style="font-size:15px; margin-top:0;">Novo Usuário</h3>
+            <form id="formUsuario">
+              <input type="hidden" id="uid">
+              <label class="form-label">Usuário (login)</label>
+              <input class="form-control" id="nome_usuario" style="margin-bottom:12px;" required>
+              <label class="form-label">Nome Completo</label>
+              <input class="form-control" id="nome_completo" style="margin-bottom:12px;" required>
+              <label class="form-label">Perfil</label>
+              <select class="form-select" id="perfil" style="margin-bottom:12px;">
+                <option value="VENDEDORA">Vendedora</option>
+                <option value="ADMIN">Administrador</option>
+              </select>
+              <label class="form-label" id="labelSenha">Senha</label>
+              <input type="text" class="form-control" id="senha" style="margin-bottom:16px;" placeholder="Deixe em branco para não alterar">
+              <div style="display:flex; gap:8px;">
+                <button type="submit" class="btn-brand"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
+                <button type="button" class="btn-outline" onclick="fecharForm()">Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </main>`;
+  carregarUsuarios();
+  document.getElementById('formUsuario').addEventListener('submit', salvarUsuario);
+}
+
+async function carregarUsuarios() {
+  const corpo = document.getElementById('corpoUsuarios');
+  try {
+    const lista = await api('usuarios');
+    corpo.innerHTML = lista.map((u) => `
+      <tr>
+        <td><strong>${u.nome_usuario}</strong></td>
+        <td>${u.nome_completo}</td>
+        <td>${u.perfil === 'ADMIN' ? 'Administrador' : 'Vendedora'}</td>
+        <td>${u.ativo ? '<span class="badge-status st-concluida">Ativo</span>' : '<span class="badge-status st-cancelada">Inativo</span>'}</td>
+        <td><button class="icon-btn" onclick='abrirEdicao(${JSON.stringify(u)})' title="Editar / Resetar senha"><i class="fa-solid fa-pen"></i></button></td>
+      </tr>`).join('');
+  } catch (err) {
+    corpo.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
+  }
+}
+
+function abrirNovo() {
+  document.getElementById('tituloForm').textContent = 'Novo Usuário';
+  document.getElementById('uid').value = '';
+  document.getElementById('nome_usuario').value = '';
+  document.getElementById('nome_usuario').disabled = false;
+  document.getElementById('nome_completo').value = '';
+  document.getElementById('perfil').value = 'VENDEDORA';
+  document.getElementById('senha').value = '';
+  document.getElementById('senha').placeholder = 'Senha inicial';
+  document.getElementById('labelSenha').textContent = 'Senha';
+  document.getElementById('cardForm').style.display = 'block';
+}
+
+function abrirEdicao(u) {
+  document.getElementById('tituloForm').textContent = `Editar: ${u.nome_usuario}`;
+  document.getElementById('uid').value = u.id;
+  document.getElementById('nome_usuario').value = u.nome_usuario;
+  document.getElementById('nome_usuario').disabled = true;
+  document.getElementById('nome_completo').value = u.nome_completo;
+  document.getElementById('perfil').value = u.perfil;
+  document.getElementById('senha').value = '';
+  document.getElementById('senha').placeholder = 'Deixe em branco para não alterar';
+  document.getElementById('labelSenha').textContent = 'Resetar Senha (opcional)';
+  document.getElementById('cardForm').style.display = 'block';
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+}
+
+function fecharForm() { document.getElementById('cardForm').style.display = 'none'; }
+
+async function salvarUsuario(e) {
+  e.preventDefault();
+  const id = document.getElementById('uid').value;
+  try {
+    if (id) {
+      await api('usuarios', { method: 'PUT', body: {
+        id,
+        nome_completo: document.getElementById('nome_completo').value.trim(),
+        perfil: document.getElementById('perfil').value,
+        nova_senha: document.getElementById('senha').value || undefined,
+      }});
+      toast('Usuário atualizado.');
+    } else {
+      await api('usuarios', { method: 'POST', body: {
+        nome_usuario: document.getElementById('nome_usuario').value.trim(),
+        nome_completo: document.getElementById('nome_completo').value.trim(),
+        perfil: document.getElementById('perfil').value,
+        senha: document.getElementById('senha').value,
+      }});
+      toast('Usuário criado.');
+    }
+    fecharForm();
+    carregarUsuarios();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+</script>
+</body>
+</html>

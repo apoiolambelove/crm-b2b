@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard · LambeLove</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="/css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app-shell" id="shell"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script>
+const usuario = protegerPagina();
+if (usuario) {
+  document.getElementById('shell').innerHTML = `
+    ${montarShell('dashboard', usuario)}
+    <main class="main">
+      ${montarTopbar('Dashboard', 'Panorama geral dos pedidos e comissões')}
+      <div class="content" id="conteudo">
+        <div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando indicadores...</div>
+      </div>
+    </main>`;
+  carregarDashboard();
+}
+
+async function carregarDashboard() {
+  try {
+    const d = await api('dashboard');
+    document.getElementById('conteudo').innerHTML = `
+      <div class="section-head"><h2>Pedidos</h2></div>
+      <div class="stat-grid" style="margin-bottom:24px;">
+        ${cardStat('Total de Pedidos', d.totalPedidos, 'primary', 'fa-boxes-stacked')}
+        ${cardStat('Total Vendido', formatarMoeda(d.totalVendido), 'primary', 'fa-sack-dollar')}
+        ${cardStat('Pedidos do Mês', d.pedidosDoMes, 'neutral', 'fa-calendar-days')}
+        ${cardStat('Pedidos do Dia', d.pedidosDoDia, 'neutral', 'fa-calendar-day')}
+        ${cardStat('Aguardando Aprovação', d.pedidosPendentes, 'amber', 'fa-hourglass-half')}
+        ${cardStat('Concluídos', d.pedidosConcluidos, 'primary', 'fa-circle-check')}
+        ${cardStat('Não Efetivados', d.pedidosNaoEfetivados, 'coral', 'fa-circle-xmark')}
+        ${cardStat('Aguardando Pagamento', d.pedidosAguardandoPagamento, 'amber', 'fa-clock')}
+      </div>
+
+      <div class="section-head"><h2>Comissões (15%)</h2></div>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 14px;">A comissão só é <strong>a pagar de fato</strong> quando o pedido estiver com status <strong>"Venda Concluída"</strong> (cliente já pagou e o pacote foi despachado). Os demais valores são apenas previsão, podendo ainda mudar ou ser cancelados.</p>
+      <div class="stat-grid" style="grid-template-columns:repeat(2,1fr); margin-bottom:26px;">
+        ${cardStat('Comissão Prevista (Total)', formatarMoeda(d.comissaoPrevista), 'neutral', 'fa-coins')}
+        ${cardStat('Comissão a Pagar (Vendas Concluídas)', formatarMoeda(d.comissaoAprovada), 'primary', 'fa-badge-check')}
+      </div>
+
+      <div class="card"><div class="card-body">
+        <h2 style="font-size:15px; margin:0 0 14px;">Vendas por mês</h2>
+        <canvas id="graficoVendas" height="90"></canvas>
+      </div></div>
+    `;
+    desenharGrafico(d.grafico);
+  } catch (err) {
+    document.getElementById('conteudo').innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div>`;
+  }
+}
+
+function cardStat(label, value, stripe, icon) {
+  return `
+    <div class="ledger-card stripe-${stripe}">
+      <div class="label"><i class="fa-solid ${icon}" style="margin-right:6px;"></i>${label}</div>
+      <div class="value">${value}</div>
+    </div>`;
+}
+
+function desenharGrafico(serie) {
+  const ctx = document.getElementById('graficoVendas');
+  const corPrimaria = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: serie.map((s) => s.mes),
+      datasets: [{
+        label: 'Total vendido (R$)',
+        data: serie.map((s) => s.total),
+        backgroundColor: corPrimaria,
+        borderRadius: 6,
+        maxBarThickness: 46,
+      }],
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, grid: { color: 'rgba(128,128,128,.15)' } }, x: { grid: { display: false } } },
+    },
+  });
+}
+</script>
+</body>
+</html>

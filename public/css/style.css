@@ -1,0 +1,315 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+:root{
+  --bg: #F7F5F0;
+  --bg-elevated: #FFFFFF;
+  --bg-soft: #F0EDE4;
+  --ink: #1F2A28;
+  --ink-soft: #5B6B67;
+  --line: #E4E0D6;
+  --primary: #0F4C45;
+  --primary-soft: #E4EEEC;
+  --amber: #E8A33D;
+  --amber-soft: #FBF1DF;
+  --coral: #D65A4A;
+  --coral-soft: #FBE9E6;
+  --sidebar-bg: #0F4C45;
+  --sidebar-ink: #DCEAE6;
+  --sidebar-ink-active: #FFFFFF;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(15,30,28,.04), 0 6px 18px rgba(15,30,28,.06);
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+[data-theme="dark"]{
+  --bg: #12201D;
+  --bg-elevated: #182E29;
+  --bg-soft: #0E1B18;
+  --ink: #ECF3F0;
+  --ink-soft: #9DB3AE;
+  --line: #24403A;
+  --primary: #4FB89F;
+  --primary-soft: #1C3833;
+  --amber: #F0B85B;
+  --amber-soft: #2E2615;
+  --coral: #E97D6D;
+  --coral-soft: #3A1F1B;
+  --sidebar-bg: #0B1715;
+  --sidebar-ink: #9DB3AE;
+  --sidebar-ink-active: #FFFFFF;
+}
+
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:14.5px;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4,.display{font-family:var(--font-display); letter-spacing:-0.01em;}
+.mono{font-family:var(--font-mono); font-variant-numeric: tabular-nums;}
+a{color:inherit;}
+
+/* ---------- Layout shell ---------- */
+.app-shell{display:flex; min-height:100vh;}
+
+.sidebar{
+  width:230px; flex-shrink:0;
+  background:var(--sidebar-bg);
+  color:var(--sidebar-ink);
+  display:flex; flex-direction:column;
+  padding:20px 0;
+}
+.sidebar .brand{
+  display:flex; align-items:center; gap:10px;
+  padding:0 20px 22px 20px;
+  font-family:var(--font-display); font-weight:700; font-size:18px;
+  color:#fff;
+  border-bottom:1px solid rgba(255,255,255,.12);
+  margin-bottom:14px;
+}
+.sidebar .brand .mark{
+  width:30px; height:30px; border-radius:7px;
+  background:var(--amber);
+  display:flex; align-items:center; justify-content:center;
+  color:#28210B; font-weight:700; font-size:14px;
+}
+.brand-logo{
+  width:32px; height:32px; object-fit:contain; border-radius:6px; background:#fff;
+}
+.nav-link{
+  display:flex; align-items:center; gap:11px;
+  padding:10px 20px; margin:2px 10px;
+  border-radius:8px;
+  color:var(--sidebar-ink);
+  text-decoration:none;
+  font-size:13.5px; font-weight:500;
+  transition:background .15s ease, color .15s ease;
+}
+.nav-link i{width:18px; text-align:center; font-size:14px;}
+.nav-link:hover{background:rgba(255,255,255,.08); color:#fff;}
+.nav-link.active{background:rgba(255,255,255,.14); color:var(--sidebar-ink-active); font-weight:600;}
+.nav-section-label{
+  font-size:10.5px; text-transform:uppercase; letter-spacing:.08em;
+  color:rgba(220,234,230,.5); padding:16px 22px 6px;
+}
+.sidebar-footer{margin-top:auto; padding:14px 20px 0; border-top:1px solid rgba(255,255,255,.12);}
+.user-chip{display:flex; align-items:center; gap:10px; font-size:13px;}
+.user-chip .avatar{
+  width:32px; height:32px; border-radius:50%;
+  background:var(--amber); color:#28210B;
+  display:flex; align-items:center; justify-content:center; font-weight:700;
+}
+.logout-btn{
+  background:none; border:none; color:var(--sidebar-ink); font-size:12px;
+  cursor:pointer; padding:0; margin-top:6px; opacity:.75;
+}
+.logout-btn:hover{opacity:1; color:#fff;}
+
+.main{flex:1; min-width:0; display:flex; flex-direction:column;}
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 28px; background:var(--bg-elevated);
+  border-bottom:1px solid var(--line);
+}
+.topbar h1{font-size:19px; margin:0;}
+.topbar .subtitle{color:var(--ink-soft); font-size:12.5px; margin-top:2px;}
+.content{padding:26px 28px; flex:1;}
+
+.theme-toggle{
+  border:1px solid var(--line); background:var(--bg-elevated);
+  color:var(--ink); border-radius:8px; padding:7px 11px; cursor:pointer; font-size:13px;
+}
+
+/* ---------- Cards ---------- */
+.card{
+  background:var(--bg-elevated);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+}
+.card-body{padding:18px 20px;}
+
+/* Signature element: ledger stripe — a colored left tab that encodes status,
+   used consistently on stat cards, table rows and the order detail panel. */
+.ledger-card{
+  border-left:4px solid var(--line);
+  padding:16px 18px;
+  background:var(--bg-elevated);
+  border-radius:var(--radius);
+  border-top:1px solid var(--line); border-right:1px solid var(--line); border-bottom:1px solid var(--line);
+  box-shadow:var(--shadow);
+}
+.ledger-card .label{font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); font-weight:600;}
+.ledger-card .value{font-family:var(--font-mono); font-size:24px; font-weight:600; margin-top:4px;}
+.ledger-card.stripe-primary{border-left-color:var(--primary);}
+.ledger-card.stripe-amber{border-left-color:var(--amber);}
+.ledger-card.stripe-coral{border-left-color:var(--coral);}
+.ledger-card.stripe-neutral{border-left-color:var(--ink-soft);}
+
+.stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px;}
+@media (max-width:1100px){.stat-grid{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:600px){.stat-grid{grid-template-columns:1fr;}}
+
+/* ---------- Status badges ---------- */
+.badge-status{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 10px; border-radius:20px;
+  font-size:11.5px; font-weight:600; white-space:nowrap;
+}
+.badge-status::before{content:''; width:6px; height:6px; border-radius:50%; background:currentColor;}
+.st-aguardando{background:var(--amber-soft); color:#9A6B16;}
+.st-concluida{background:var(--primary-soft); color:var(--primary);}
+.st-pendente_pagamento{background:#FFF0E0; color:#B05E12;}
+.st-nao_efetivada{background:var(--coral-soft); color:var(--coral);}
+.st-cancelada{background:#EEE; color:#777;}
+[data-theme="dark"] .st-cancelada{background:#2A2A2A; color:#aaa;}
+
+/* ---------- Tables ---------- */
+.table-wrap{background:var(--bg-elevated); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow);}
+table{width:100%; border-collapse:collapse; font-size:13.5px;}
+thead th{
+  text-align:left; padding:11px 14px; font-size:11px; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--ink-soft); border-bottom:1px solid var(--line); background:var(--bg);
+  font-weight:600;
+}
+tbody td{padding:12px 14px; border-bottom:1px solid var(--line); vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:var(--primary-soft);}
+.num{font-family:var(--font-mono); font-variant-numeric:tabular-nums;}
+
+/* ---------- Forms ---------- */
+.form-label{font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:5px; display:block;}
+.form-control, .form-select{
+  background:var(--bg-elevated); border:1px solid var(--line); color:var(--ink);
+  border-radius:8px; padding:9px 11px; font-size:13.5px; width:100%;
+}
+.form-control:focus, .form-select:focus{
+  outline:none; border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-soft);
+}
+.form-section-title{
+  font-family:var(--font-display); font-size:14px; font-weight:600;
+  margin:26px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--line);
+  color:var(--primary);
+}
+.form-section-title:first-child{margin-top:0;}
+
+/* ---------- Buttons ---------- */
+.btn-brand{
+  background:var(--primary); color:#fff; border:none; border-radius:8px;
+  padding:10px 18px; font-weight:600; font-size:13.5px; cursor:pointer;
+  transition:transform .1s ease, opacity .15s ease;
+}
+.btn-brand:hover{opacity:.92;}
+.btn-brand:active{transform:scale(.98);}
+.btn-outline{
+  background:transparent; color:var(--primary); border:1px solid var(--primary);
+  border-radius:8px; padding:9px 16px; font-weight:600; font-size:13px; cursor:pointer;
+}
+.btn-outline:hover{background:var(--primary-soft);}
+.btn-danger{
+  background:var(--coral-soft); color:var(--coral); border:1px solid transparent;
+  border-radius:8px; padding:8px 14px; font-weight:600; font-size:12.5px; cursor:pointer;
+}
+.btn-danger:hover{border-color:var(--coral);}
+.btn-sm{padding:6px 11px; font-size:12px; border-radius:7px;}
+.icon-btn{
+  background:none; border:1px solid var(--line); color:var(--ink-soft); border-radius:7px;
+  width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer;
+}
+.icon-btn:hover{color:var(--ink); border-color:var(--ink-soft);}
+
+/* ---------- Login page ---------- */
+.login-shell{
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(232,163,61,.12), transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(15,76,69,.10), transparent 45%),
+    var(--bg);
+  padding:20px;
+}
+.login-card{
+  width:100%; max-width:380px; background:var(--bg-elevated);
+  border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow);
+  padding:34px 30px; text-align:center;
+}
+.login-logo{
+  width:132px; height:132px; object-fit:contain; display:block; margin:0 auto 16px;
+}
+
+/* ---------- Card de produto único (novo pedido) ---------- */
+.product-card{
+  display:flex; align-items:center; gap:14px;
+  border:2px solid var(--amber); border-radius:12px;
+  padding:14px 16px; background:var(--bg-elevated, #fff);
+  cursor:default;
+}
+.product-card img{ width:52px; height:52px; object-fit:contain; border-radius:8px; background:#fff; }
+.product-card .product-info{ flex:1; }
+.product-card .product-name{ font-weight:700; font-size:14.5px; }
+.product-card .product-suggestion{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+.product-card .product-check{ color:var(--amber); font-size:20px; }
+
+/* ---------- Opções de frete ---------- */
+.frete-opcao{
+  display:flex; align-items:center; gap:10px;
+  padding:9px 12px; border:1px solid var(--line); border-radius:8px;
+  margin-bottom:6px; cursor:pointer; font-size:13px;
+}
+.frete-opcao:hover{ background:rgba(0,0,0,.03); }
+
+/* ---------- Autocomplete de clientes (novo pedido) ---------- */
+.cliente-sugestoes{
+  position:absolute; top:100%; left:0; right:0; z-index:20;
+  background:var(--bg-elevated, #fff); border:1px solid var(--line);
+  border-radius:8px; margin-top:4px; max-height:220px; overflow-y:auto;
+  box-shadow:0 6px 18px rgba(0,0,0,.12);
+}
+.cliente-sugestoes .item{
+  padding:9px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--line);
+}
+.cliente-sugestoes .item:last-child{ border-bottom:none; }
+.cliente-sugestoes .item:hover{ background:rgba(0,0,0,.04); }
+.cliente-sugestoes .item small{ display:block; color:var(--ink-soft); font-size:11px; }
+.login-card h1{font-size:21px; margin:0 0 4px;}
+.login-card p.lead{color:var(--ink-soft); font-size:13px; margin:0 0 24px;}
+.login-error{
+  background:var(--coral-soft); color:var(--coral); font-size:12.5px;
+  padding:9px 12px; border-radius:8px; margin-bottom:14px; display:none;
+}
+
+/* ---------- Misc ---------- */
+.toast-stack{position:fixed; top:18px; right:18px; z-index:2000; display:flex; flex-direction:column; gap:8px;}
+.toast-msg{
+  background:var(--ink); color:var(--bg); padding:11px 16px; border-radius:8px; font-size:13px;
+  box-shadow:var(--shadow); display:flex; align-items:center; gap:8px; min-width:220px;
+  animation:slidein .2s ease;
+}
+.toast-msg.success{background:var(--primary);}
+.toast-msg.error{background:var(--coral);}
+@keyframes slidein{from{transform:translateX(20px); opacity:0;} to{transform:translateX(0); opacity:1;}}
+
+.empty-state{text-align:center; padding:50px 20px; color:var(--ink-soft);}
+.empty-state i{font-size:28px; margin-bottom:10px; display:block; color:var(--line);}
+
+.section-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;}
+.section-head h2{font-size:17px; margin:0;}
+
+.filters-bar{
+  display:flex; flex-wrap:wrap; gap:10px; padding:14px 16px;
+  background:var(--bg-elevated); border:1px solid var(--line); border-radius:var(--radius);
+  margin-bottom:16px;
+}
+.filters-bar .form-control, .filters-bar .form-select{width:auto; min-width:140px;}
+
+@media (max-width:860px){
+  .sidebar{position:fixed; left:-230px; top:0; bottom:0; z-index:1500; transition:left .2s ease;}
+  .sidebar.open{left:0;}
+  .content{padding:18px;}
+  .topbar{padding:14px 16px;}
+}
