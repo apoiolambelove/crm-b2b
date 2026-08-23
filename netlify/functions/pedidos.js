@@ -95,10 +95,16 @@ exports.handler = async (event) => {
         const { data, error } = await supabase.from('vw_pedidos').select('*').eq('id', params.id).maybeSingle();
         if (error) throw error;
         if (!data) return fail('Pedido não encontrado', 404);
+        if (!ehAdmin(usuario) && data.criado_por !== usuario.id) {
+          return fail('Você não tem permissão para ver este pedido.', 403);
+        }
         return ok(data);
       }
 
       let query = supabase.from('vw_pedidos').select('*').order('criado_em', { ascending: false });
+
+      // Vendedora só vê os próprios pedidos; Administrador vê todos.
+      if (!ehAdmin(usuario)) query = query.eq('criado_por', usuario.id);
 
       if (params.cliente) query = query.ilike('nome_empresa', `%${params.cliente}%`);
       if (params.cidade) query = query.ilike('cidade', `%${params.cidade}%`);
@@ -163,9 +169,15 @@ exports.handler = async (event) => {
       if (getErr) throw getErr;
       if (!atual) return fail('Pedido não encontrado', 404);
 
-      // Vendedora só pode editar enquanto o pedido está pendente; admin edita sempre.
-      if (!ehAdmin(usuario) && atual.status !== 'AGUARDANDO_APROVACAO') {
-        return fail('Este pedido já foi avaliado pelo administrador e não pode mais ser editado.', 403);
+      // Vendedora só edita os próprios pedidos, e somente enquanto estiverem
+      // pendentes; admin edita qualquer pedido, a qualquer momento.
+      if (!ehAdmin(usuario)) {
+        if (atual.criado_por !== usuario.id) {
+          return fail('Você não tem permissão para editar este pedido.', 403);
+        }
+        if (atual.status !== 'AGUARDANDO_APROVACAO') {
+          return fail('Este pedido já foi avaliado pelo administrador e não pode mais ser editado.', 403);
+        }
       }
 
       if (body.forma_pagamento !== undefined && !FORMAS_PAGAMENTO_PERMITIDAS.includes(body.forma_pagamento)) {

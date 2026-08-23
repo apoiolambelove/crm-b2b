@@ -1,5 +1,5 @@
 const { getSupabase } = require('./utils/db');
-const { autenticar } = require('./utils/auth');
+const { autenticar, ehAdmin } = require('./utils/auth');
 const { ok, fail, preflight } = require('./utils/http');
 
 exports.handler = async (event) => {
@@ -19,12 +19,16 @@ exports.handler = async (event) => {
   const fim = fimDate.toISOString().slice(0, 10);
 
   try {
-    const { data: pedidos, error } = await supabase
+    // Vendedora só vê o relatório dos próprios pedidos; Administrador vê de todos.
+    let query = supabase
       .from('vw_pedidos')
       .select('*')
       .gte('data_pedido', inicio)
       .lte('data_pedido', fim)
       .order('data_pedido', { ascending: true });
+    if (!ehAdmin(usuario)) query = query.eq('criado_por', usuario.id);
+
+    const { data: pedidos, error } = await query;
     if (error) throw error;
 
     const quantidadePedidos = pedidos.length;

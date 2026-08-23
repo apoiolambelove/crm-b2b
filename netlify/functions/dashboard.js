@@ -1,5 +1,5 @@
 const { getSupabase } = require('./utils/db');
-const { autenticar } = require('./utils/auth');
+const { autenticar, ehAdmin } = require('./utils/auth');
 const { ok, fail, preflight } = require('./utils/http');
 
 exports.handler = async (event) => {
@@ -12,7 +12,10 @@ exports.handler = async (event) => {
   const supabase = getSupabase();
 
   try {
-    const { data: pedidos, error } = await supabase.from('vw_pedidos').select('*');
+    // Vendedora só vê indicadores dos próprios pedidos; Administrador vê tudo.
+    let query = supabase.from('vw_pedidos').select('*');
+    if (!ehAdmin(usuario)) query = query.eq('criado_por', usuario.id);
+    const { data: pedidos, error } = await query;
     if (error) throw error;
 
     const hoje = new Date().toISOString().slice(0, 10);
