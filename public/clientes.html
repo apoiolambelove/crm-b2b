@@ -47,6 +47,7 @@ if (usuario) {
                 <div class="col-md-6"><label class="form-label">Nome da Empresa *</label><input class="form-control" id="nome_empresa" required></div>
                 <div class="col-md-3"><label class="form-label">CNPJ</label><input class="form-control" id="cnpj"></div>
                 <div class="col-md-3"><label class="form-label">Inscrição Estadual</label><input class="form-control" id="inscricao_estadual"></div>
+                ${usuario.perfil === 'ADMIN' ? `<div class="col-md-4"><label class="form-label">Vendedor(a) Responsável</label><select class="form-select" id="criado_por"><option value="">Carregando...</option></select></div>` : ''}
                 <div class="col-md-4"><label class="form-label">Nome do Sócio/Contato</label><input class="form-control" id="nome_socio"></div>
                 <div class="col-md-4"><label class="form-label">Telefone</label><input class="form-control" id="telefone"></div>
                 <div class="col-md-4"><label class="form-label">WhatsApp</label><input class="form-control" id="whatsapp"></div>
@@ -79,8 +80,22 @@ if (usuario) {
 
   configurarCepCliente();
   carregarClientes();
+  if (usuario.perfil === 'ADMIN') carregarVendedores();
   document.getElementById('formCliente').addEventListener('submit', salvarCliente);
   document.getElementById('fBusca').addEventListener('input', debounce(() => carregarClientes(document.getElementById('fBusca').value), 300));
+}
+
+let vendedoresCache = [];
+async function carregarVendedores() {
+  const select = document.getElementById('criado_por');
+  if (!select) return;
+  try {
+    vendedoresCache = await api('usuarios');
+    select.innerHTML = '<option value="">— Sem vendedor definido —</option>' +
+      vendedoresCache.map((u) => `<option value="${u.id}">${u.nome_completo}${u.ativo ? '' : ' (inativo)'}</option>`).join('');
+  } catch (err) {
+    select.innerHTML = '<option value="">Não foi possível carregar</option>';
+  }
 }
 
 function debounce(fn, ms) {
@@ -184,6 +199,9 @@ async function salvarCliente(e) {
     cep: val('cep'), endereco: val('endereco'), numero: val('numero'), complemento: val('complemento'),
     bairro: val('bairro'), cidade: val('cidade'), estado: val('estado'),
   };
+  if (usuario.perfil === 'ADMIN') {
+    payload.criado_por = val('criado_por') || null;
+  }
 
   const id = val('cid');
   try {

@@ -3,7 +3,7 @@ const { autenticar, ehAdmin } = require('./utils/auth');
 const { ok, fail, preflight, getClientIp } = require('./utils/http');
 const { PRODUTO } = require('../../public/js/produto.js');
 
-const STATUS_ADMIN_ONLY = ['VENDA_CONCLUIDA', 'PENDENTE_PAGAMENTO', 'NAO_EFETIVADA', 'CANCELADA'];
+const STATUS_ADMIN_ONLY = ['AGUARDANDO_APROVACAO', 'VENDA_CONCLUIDA', 'PENDENTE_PAGAMENTO', 'NAO_EFETIVADA', 'CANCELADA'];
 const FORMAS_PAGAMENTO_PERMITIDAS = ['PIX', 'TRANSFERENCIA', 'CARTAO'];
 
 // Confere se a quantidade e o valor total batem com a faixa de preço unitário

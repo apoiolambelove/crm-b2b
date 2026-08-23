@@ -68,7 +68,7 @@ exports.handler = async (event) => {
         nome_socio: body.nome_socio || null, telefone: body.telefone || null, whatsapp: body.whatsapp || null,
         email: body.email || null, cep: body.cep || null, endereco: body.endereco || null, numero: body.numero || null,
         complemento: body.complemento || null, bairro: body.bairro || null, cidade: body.cidade || null, estado: body.estado || null,
-        criado_por: usuario.id,
+        criado_por: (admin && body.criado_por) ? body.criado_por : usuario.id,
       }).select('*').single();
       if (error) throw error;
       return ok(data, 201);
@@ -89,6 +89,12 @@ exports.handler = async (event) => {
         'email', 'cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado'];
       const updateData = {};
       camposEditaveis.forEach((c) => { if (body[c] !== undefined) updateData[c] = body[c]; });
+
+      // Só o Administrador pode transferir o cliente para outro vendedor.
+      if (admin && body.criado_por !== undefined) {
+        updateData.criado_por = body.criado_por || null;
+      }
+
       updateData.atualizado_em = new Date().toISOString();
 
       const { data, error } = await supabase.from('clientes').update(updateData).eq('id', body.id).select('*').single();
