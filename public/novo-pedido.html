@@ -66,7 +66,7 @@ if (usuario) {
                 <img src="/img/logo.png" alt="produto">
                 <div class="product-info">
                   <div class="product-name" id="produtoNome"></div>
-                  <div class="product-suggestion">Preço: <strong id="produtoSugestao"></strong> (pode ir até <strong id="produtoMaximo"></strong>)</div>
+                  <div class="product-suggestion">Preço sugerido: <strong id="produtoSugestao"></strong> — valor livre por enquanto, ajuste conforme a negociação</div>
                 </div>
                 <i class="fa-solid fa-circle-check product-check"></i>
               </div>
@@ -75,12 +75,12 @@ if (usuario) {
             <div class="col-md-3">
               <label class="form-label">Quantidade (mín. <span id="qtdMinimaLabel"></span>) *</label>
               <input type="number" class="form-control" id="quantidade" required>
-              <div id="quantidadeAviso" style="font-size:11.5px; color:var(--coral); margin-top:4px; display:none;">Quantidade mínima é 30 unidades.</div>
+              <div id="quantidadeAviso" style="font-size:11.5px; color:var(--coral); margin-top:4px; display:none;">Informe uma quantidade válida.</div>
             </div>
             <div class="col-md-3">
               <label class="form-label">Preço Unitário (R$) *</label>
               <input class="form-control" id="preco_unitario" required>
-              <div id="precoAviso" style="font-size:11.5px; color:var(--coral); margin-top:4px; display:none;">Preço deve ficar entre R$ 59,00 e R$ 89,00.</div>
+              <div id="precoAviso" style="font-size:11.5px; color:var(--coral); margin-top:4px; display:none;">Informe um preço válido.</div>
             </div>
             <div class="col-md-3"><label class="form-label">Valor Total (R$)</label><input class="form-control" id="valor_total" readonly style="background:var(--bg-soft, #f4f4f4);"></div>
             <div class="col-md-3">
@@ -89,6 +89,7 @@ if (usuario) {
                 <option value="">Selecione</option>
                 <option value="PIX">PIX</option>
                 <option value="TRANSFERENCIA">Transferência</option>
+                <option value="CARTAO">Cartão de Crédito</option>
               </select>
             </div>
           </div>
@@ -152,7 +153,6 @@ function configurarProduto() {
   document.getElementById('produtos').value = PRODUTO.nome;
   document.getElementById('produtoNome').textContent = PRODUTO.nome;
   document.getElementById('produtoSugestao').textContent = 'R$ ' + PRODUTO.preco_padrao.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-  document.getElementById('produtoMaximo').textContent = 'R$ ' + PRODUTO.preco_maximo.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
   document.getElementById('qtdMinimaLabel').textContent = PRODUTO.quantidade_minima;
 
   const qtdInput = document.getElementById('quantidade');
@@ -160,7 +160,7 @@ function configurarProduto() {
   qtdInput.value = PRODUTO.quantidade_minima;
   precoInput.value = PRODUTO.preco_padrao.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
-  qtdInput.addEventListener('input', () => { validarQuantidade(); recalcularValores(); });
+  qtdInput.addEventListener('input', () => { validarQuantidade(); validarPreco(); recalcularValores(); });
   precoInput.addEventListener('input', () => { validarPreco(); recalcularValores(); });
   document.getElementById('cep').addEventListener('input', limparFrete);
 

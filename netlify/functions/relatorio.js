@@ -35,8 +35,11 @@ exports.handler = async (event) => {
     const cancelados = pedidos.filter((p) => p.status === 'CANCELADA' || p.status === 'NAO_EFETIVADA');
 
     const valorComissoes = pedidos.reduce((s, p) => s + Number(p.valor_comissao || 0), 0);
-    const valorAprovado = pedidos.filter((p) => p.comissao_status === 'APROVADA').reduce((s, p) => s + Number(p.valor_comissao || 0), 0);
-    const valorPendente = valorComissoes - valorAprovado;
+    const valorPago = pedidos.filter((p) => p.status === 'VENDA_CONCLUIDA' && p.status_pagamento_comissao === 'ACEITO')
+      .reduce((s, p) => s + Number(p.valor_comissao || 0), 0);
+    const valorAprovado = pedidos.filter((p) => p.status === 'VENDA_CONCLUIDA' && p.status_pagamento_comissao !== 'ACEITO')
+      .reduce((s, p) => s + Number(p.valor_comissao || 0), 0);
+    const valorPendente = valorComissoes - valorAprovado - valorPago;
 
     return ok({
       periodo: { mes: Number(mes), ano: Number(ano) },
@@ -47,6 +50,7 @@ exports.handler = async (event) => {
       pedidosPendentes: pendentes.length,
       pedidosCancelados: cancelados.length,
       valorComissoes,
+      valorPago,
       valorAprovado,
       valorPendente,
       pedidos,

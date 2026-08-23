@@ -58,18 +58,21 @@ async function gerarRelatorio() {
         ${cardStat('Pendentes', r.pedidosPendentes, 'amber')}
         ${cardStat('Cancelados / Não Efetivados', r.pedidosCancelados, 'coral')}
         ${cardStat('Frete Total', formatarMoeda(r.totalFrete || 0), 'neutral')}
-        ${cardStat('Comissão Prevista (Total)', formatarMoeda(r.valorComissoes), 'neutral')}
-        ${cardStat('Comissão a Pagar (Concluídas)', formatarMoeda(r.valorAprovado), 'primary')}
-        ${cardStat('Comissão Futura (Não Confirmada)', formatarMoeda(r.valorPendente), 'amber')}
+        ${cardStat('Comissão Já Recebida (Paga)', formatarMoeda(r.valorPago || 0), 'primary')}
+        ${cardStat('Comissão a Receber (Concluídas)', formatarMoeda(r.valorAprovado), 'amber')}
+        ${cardStat('Comissão Futura (Não Confirmada)', formatarMoeda(r.valorPendente), 'neutral')}
       </div>
       <p style="font-size:12px; color:var(--ink-soft); margin:0 0 20px;">
-        <i class="fa-solid fa-circle-info"></i> A comissão só é <strong>a pagar de fato</strong> quando o pedido estiver "Venda Concluída". Os valores marcados como "futura" são apenas previsão.
+        <i class="fa-solid fa-circle-info"></i> "Recebida" = a vendedora já confirmou o pagamento na aba Comissões. "A Receber" = venda concluída, mas ainda não paga/confirmada. "Futura" = venda ainda não concluída, valor apenas previsto.
       </p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Nº</th><th>Data</th><th>Empresa</th><th>Valor</th><th>Frete</th><th>Status</th><th>Comissão</th></tr></thead>
           <tbody>
-            ${r.pedidos.length ? r.pedidos.map((p) => `
+            ${r.pedidos.length ? r.pedidos.map((p) => {
+              let tag = 'futura';
+              if (p.status === 'VENDA_CONCLUIDA') tag = p.status_pagamento_comissao === 'ACEITO' ? 'recebida' : 'a receber';
+              return `
               <tr>
                 <td class="num">#${p.numero_pedido}</td>
                 <td>${formatarDataBR(p.data_pedido)}</td>
@@ -77,8 +80,9 @@ async function gerarRelatorio() {
                 <td class="num">${formatarMoeda(p.valor_total)}</td>
                 <td class="num">${formatarMoeda(p.valor_frete || 0)}</td>
                 <td>${badgeStatus(p.status)}</td>
-                <td class="num">${formatarMoeda(p.valor_comissao)} <span style="font-size:10px; color:var(--ink-soft);">${p.comissao_status === 'APROVADA' ? '· a pagar' : '· futura'}</span></td>
-              </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Nenhum pedido neste período.</div></td></tr>`}
+                <td class="num">${formatarMoeda(p.valor_comissao)} <span style="font-size:10px; color:var(--ink-soft);">· ${tag}</span></td>
+              </tr>`;
+            }).join('') : `<tr><td colspan="7"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Nenhum pedido neste período.</div></td></tr>`}
           </tbody>
         </table>
       </div>`;
@@ -133,19 +137,25 @@ async function exportarPDF() {
     14, 36,
   );
   doc.setTextColor(15, 76, 69);
-  doc.text(`Comissão a Receber (Vendas Concluídas): ${formatarMoeda(relatorioAtual.valorAprovado)}`, 14, 42);
+  doc.text(`Comissão Já Recebida (Paga): ${formatarMoeda(relatorioAtual.valorPago || 0)}`, 14, 42);
   doc.setTextColor(184, 108, 26);
-  doc.text(`Comissão Pendente (Não Confirmada): ${formatarMoeda(relatorioAtual.valorPendente)}`, 14, 48);
+  doc.text(`Comissão a Receber (Concluídas, Não Pagas): ${formatarMoeda(relatorioAtual.valorAprovado)}`, 14, 48);
+  doc.setTextColor(120);
+  doc.text(`Comissão Futura (Não Confirmada): ${formatarMoeda(relatorioAtual.valorPendente)}`, 14, 54);
   doc.setTextColor(0);
 
   doc.autoTable({
-    startY: 54,
+    startY: 60,
     head: [['Nº', 'Data', 'Empresa', 'Valor', 'Frete', 'Status', 'Comissão']],
-    body: relatorioAtual.pedidos.map((p) => [
-      p.numero_pedido, formatarDataBR(p.data_pedido), p.nome_empresa,
-      formatarMoeda(p.valor_total), formatarMoeda(p.valor_frete || 0), STATUS_LABEL[p.status],
-      formatarMoeda(p.valor_comissao) + (p.comissao_status === 'APROVADA' ? ' (a receber)' : ' (pendente)'),
-    ]),
+    body: relatorioAtual.pedidos.map((p) => {
+      let tag = 'futura';
+      if (p.status === 'VENDA_CONCLUIDA') tag = p.status_pagamento_comissao === 'ACEITO' ? 'recebida' : 'a receber';
+      return [
+        p.numero_pedido, formatarDataBR(p.data_pedido), p.nome_empresa,
+        formatarMoeda(p.valor_total), formatarMoeda(p.valor_frete || 0), STATUS_LABEL[p.status],
+        formatarMoeda(p.valor_comissao) + ` (${tag})`,
+      ];
+    }),
     styles: { fontSize: 8 },
     headStyles: { fillColor: [15, 76, 69] },
   });
@@ -154,11 +164,15 @@ async function exportarPDF() {
 
 function exportarExcel() {
   if (!relatorioAtual) return;
-  const linhas = relatorioAtual.pedidos.map((p) => ({
-    'Nº Pedido': p.numero_pedido, 'Data': formatarDataBR(p.data_pedido), 'Empresa': p.nome_empresa,
-    'Valor Total': p.valor_total, 'Frete': p.valor_frete || 0, 'Status': STATUS_LABEL[p.status], 'Comissão': p.valor_comissao,
-    'Situação da Comissão': p.comissao_status === 'APROVADA' ? 'A Receber (Venda Concluída)' : 'Pendente (Não Confirmada)',
-  }));
+  const linhas = relatorioAtual.pedidos.map((p) => {
+    let situacao = 'Futura (Não Confirmada)';
+    if (p.status === 'VENDA_CONCLUIDA') situacao = p.status_pagamento_comissao === 'ACEITO' ? 'Recebida (Paga)' : 'A Receber (Concluída, Não Paga)';
+    return {
+      'Nº Pedido': p.numero_pedido, 'Data': formatarDataBR(p.data_pedido), 'Empresa': p.nome_empresa,
+      'Valor Total': p.valor_total, 'Frete': p.valor_frete || 0, 'Status': STATUS_LABEL[p.status], 'Comissão': p.valor_comissao,
+      'Situação da Comissão': situacao,
+    };
+  });
   const ws = XLSX.utils.json_to_sheet(linhas);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Relatório');

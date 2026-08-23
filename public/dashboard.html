@@ -79,10 +79,11 @@ async function carregarDashboard() {
       </div>
 
       <div class="section-head"><h2>Comissões (15%)</h2></div>
-      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 14px;">A comissão só é <strong>a pagar de fato</strong> quando o pedido estiver com status <strong>"Venda Concluída"</strong> (cliente já pagou e o pacote foi despachado). Os demais valores são apenas previsão, podendo ainda mudar ou ser cancelados.</p>
-      <div class="stat-grid" style="grid-template-columns:repeat(2,1fr); margin-bottom:26px;">
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:-6px 0 14px;">A comissão só vira <strong>"Recebida"</strong> depois que a vendedora confirmar o pagamento na aba Comissões. Até lá, mesmo já concluída, ela conta como "a receber".</p>
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr); margin-bottom:26px;">
         ${cardStat('Comissão Prevista (Total)', formatarMoeda(d.comissaoPrevista), 'neutral', 'fa-coins')}
-        ${cardStat('Comissão a Pagar (Vendas Concluídas)', formatarMoeda(d.comissaoAprovada), 'primary', 'fa-badge-check')}
+        ${cardStat('A Receber (Concluídas, Não Pagas)', formatarMoeda(d.comissaoAReceber), 'amber', 'fa-hourglass-half')}
+        ${cardStat('Recebida (Confirmada pela Vendedora)', formatarMoeda(d.comissaoPaga), 'primary', 'fa-circle-check')}
       </div>
 
       <div class="card"><div class="card-body">

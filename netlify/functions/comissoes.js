@@ -60,7 +60,7 @@ exports.handler = async (event) => {
           const chave = p.data_pedido.slice(0, 7); // YYYY-MM
           if (!porMes[chave]) porMes[chave] = { pago: 0, aReceber: 0, futuras: 0 };
           const valor = Number(p.valor_comissao || 0);
-          if (p.status === 'VENDA_CONCLUIDA' && p.pagamento_comissao_id) porMes[chave].pago += valor;
+          if (p.status === 'VENDA_CONCLUIDA' && p.status_pagamento_comissao === 'ACEITO') porMes[chave].pago += valor;
           else if (p.status === 'VENDA_CONCLUIDA') porMes[chave].aReceber += valor;
           else porMes[chave].futuras += valor;
         }

@@ -128,7 +128,10 @@ async function carregarClientes(busca) {
         <td>${c.cnpj || '-'}</td>
         <td>${c.telefone || c.whatsapp || '-'}</td>
         <td>${c.cidade ? c.cidade + '/' + (c.estado || '') : '-'}</td>
-        <td><button class="icon-btn" onclick='abrirEdicao(${JSON.stringify(c)})' title="Editar"><i class="fa-solid fa-pen"></i></button></td>
+        <td>
+          <button class="icon-btn" onclick='abrirEdicao(${JSON.stringify(c)})' title="Editar"><i class="fa-solid fa-pen"></i></button>
+          <button class="icon-btn" onclick="excluirCliente('${c.id}', '${c.nome_empresa.replace(/'/g, "\\'")}')" title="Excluir" style="color:var(--coral);"><i class="fa-solid fa-trash"></i></button>
+        </td>
       </tr>`).join('');
   } catch (err) {
     corpo.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
@@ -154,6 +157,17 @@ function abrirEdicao(c) {
 
 function fecharForm() {
   document.getElementById('cardForm').style.display = 'none';
+}
+
+async function excluirCliente(id, nome) {
+  if (!confirm(`Excluir o cliente "${nome}"? Essa ação não pode ser desfeita.`)) return;
+  try {
+    await api('clientes?id=' + id, { method: 'DELETE' });
+    toast('Cliente excluído.', 'success');
+    carregarClientes(document.getElementById('fBusca').value);
+  } catch (err) {
+    toast(err.message, 'error');
+  }
 }
 
 async function salvarCliente(e) {

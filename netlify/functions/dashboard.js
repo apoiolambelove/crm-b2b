@@ -12,7 +12,7 @@ exports.handler = async (event) => {
   const supabase = getSupabase();
 
   try {
-    const { data: pedidos, error } = await supabase.from('pedidos').select('*');
+    const { data: pedidos, error } = await supabase.from('vw_pedidos').select('*');
     if (error) throw error;
 
     const hoje = new Date().toISOString().slice(0, 10);
@@ -27,13 +27,18 @@ exports.handler = async (event) => {
     const pedidosNaoEfetivados = pedidos.filter((p) => p.status === 'NAO_EFETIVADA').length;
     const pedidosAguardandoPagamento = pedidos.filter((p) => p.status === 'PENDENTE_PAGAMENTO').length;
 
+    // Uma comissão só é considerada "Paga" depois que a vendedora confirma o recebimento
+    // (status_pagamento_comissao = 'ACEITO'). Antes disso, mesmo que já tenha sido lançada
+    // pelo Admin, ela continua contando como "a receber".
     const comissaoPrevista = pedidos
       .filter((p) => !['NAO_EFETIVADA', 'CANCELADA'].includes(p.status))
       .reduce((s, p) => s + Number(p.valor_comissao || 0), 0);
-    const comissaoAprovada = pedidos
-      .filter((p) => p.comissao_status === 'APROVADA')
+    const comissaoPaga = pedidos
+      .filter((p) => p.status === 'VENDA_CONCLUIDA' && p.status_pagamento_comissao === 'ACEITO')
       .reduce((s, p) => s + Number(p.valor_comissao || 0), 0);
-    const comissaoPaga = comissaoAprovada; // paga = aprovada neste modelo (sem etapa extra de pagamento)
+    const comissaoAReceber = pedidos
+      .filter((p) => p.status === 'VENDA_CONCLUIDA' && p.status_pagamento_comissao !== 'ACEITO')
+      .reduce((s, p) => s + Number(p.valor_comissao || 0), 0);
 
     // Série dos últimos 6 meses para o gráfico
     const seriePorMes = {};
@@ -47,7 +52,7 @@ exports.handler = async (event) => {
     return ok({
       totalPedidos, totalVendido, pedidosDoMes, pedidosDoDia,
       pedidosPendentes, pedidosConcluidos, pedidosNaoEfetivados, pedidosAguardandoPagamento,
-      comissaoPrevista, comissaoAprovada, comissaoPaga, grafico,
+      comissaoPrevista, comissaoAReceber, comissaoPaga, grafico,
     });
   } catch (e) {
     return fail('Erro no servidor: ' + e.message, 500);

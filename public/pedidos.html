@@ -19,6 +19,12 @@
 const usuario = protegerPagina();
 let pedidosAtuais = [];
 
+// Única fonte da regra: recebida (vendedora confirmou) > a receber (concluída, não paga) > futura (não concluída)
+function tagComissao(p) {
+  if (p.status !== 'VENDA_CONCLUIDA') return 'futura';
+  return p.status_pagamento_comissao === 'ACEITO' ? 'recebida' : 'a receber';
+}
+
 if (usuario) {
   document.getElementById('shell').innerHTML = `
     ${montarShell('pedidos', usuario)}
@@ -41,7 +47,7 @@ if (usuario) {
           </select>
           <select class="form-select" id="fPagamento">
             <option value="">Forma de pagamento</option>
-            <option value="PIX">PIX</option><option value="TRANSFERENCIA">Transferência</option>
+            <option value="PIX">PIX</option><option value="TRANSFERENCIA">Transferência</option><option value="CARTAO">Cartão de Crédito</option>
           </select>
           <input type="date" class="form-control" id="fInicio">
           <input type="date" class="form-control" id="fFim">
@@ -127,12 +133,23 @@ function linhaPedido(p) {
       <td class="num">${formatarMoeda(p.valor_frete || 0)}</td>
       <td>${PAGAMENTO_LABEL[p.forma_pagamento] || p.forma_pagamento}</td>
       <td>${seletorStatus}</td>
-      <td class="num">${formatarMoeda(p.valor_comissao)} <span style="font-size:10px; color:var(--ink-soft);">${p.comissao_status === 'APROVADA' ? '· aprovada' : '· pendente'}</span></td>
+      <td class="num">${formatarMoeda(p.valor_comissao)} <span style="font-size:10px; color:var(--ink-soft);">· ${tagComissao(p)}</span></td>
       <td style="white-space:nowrap;">
         ${podeEditar ? `<a class="icon-btn" href="/novo-pedido.html?id=${p.id}" title="Editar"><i class="fa-solid fa-pen"></i></a>` : ''}
+        <button class="icon-btn" onclick="gerarLinkPagamento('${p.id}')" title="Gerar link de pagamento (cartão)"><i class="fa-solid fa-credit-card"></i></button>
         ${isAdmin ? `<button class="icon-btn" onclick="excluirPedido('${p.id}', ${p.numero_pedido})" title="Excluir" style="color:var(--coral);"><i class="fa-solid fa-trash"></i></button>` : ''}
       </td>
     </tr>`;
+}
+
+async function gerarLinkPagamento(id) {
+  try {
+    const resposta = await api('pagamento', { method: 'POST', body: { pedido_id: id } });
+    await navigator.clipboard.writeText(resposta.link).catch(() => {});
+    window.prompt('Link de pagamento gerado (já copiado pra área de transferência). Envie pro cliente:', resposta.link);
+  } catch (e) {
+    alert('Não foi possível gerar o link: ' + e.message);
+  }
 }
 
 async function alterarStatus(id, status) {
@@ -210,7 +227,7 @@ async function exportarPDF() {
     body: pedidosAtuais.map((p) => [
       p.numero_pedido, formatarDataBR(p.data_pedido), p.nome_empresa, p.cidade || '-',
       formatarMoeda(p.valor_total), formatarMoeda(p.valor_frete || 0), PAGAMENTO_LABEL[p.forma_pagamento] || p.forma_pagamento,
-      STATUS_LABEL[p.status], formatarMoeda(p.valor_comissao) + (p.comissao_status === 'APROVADA' ? ' (a receber)' : ' (pendente)'),
+      STATUS_LABEL[p.status], formatarMoeda(p.valor_comissao) + ` (${tagComissao(p)})`,
     ]),
     styles: { fontSize: 8 },
     headStyles: { fillColor: [15, 76, 69] },
@@ -225,7 +242,7 @@ function exportarExcel() {
     'CNPJ': p.cnpj, 'Cidade': p.cidade, 'Estado': p.estado, 'Valor Total': p.valor_total, 'Frete': p.valor_frete || 0,
     'Forma de Pagamento': PAGAMENTO_LABEL[p.forma_pagamento] || p.forma_pagamento,
     'Status': STATUS_LABEL[p.status], 'Comissão (15%)': p.valor_comissao,
-    'Situação da Comissão': p.comissao_status === 'APROVADA' ? 'A Receber (Venda Concluída)' : 'Pendente (Não Confirmada)',
+    'Situação da Comissão': tagComissao(p) === 'recebida' ? 'Recebida (Paga)' : (tagComissao(p) === 'a receber' ? 'A Receber (Concluída, Não Paga)' : 'Futura (Não Confirmada)'),
   }));
   const ws = XLSX.utils.json_to_sheet(linhas);
   const wb = XLSX.utils.book_new();

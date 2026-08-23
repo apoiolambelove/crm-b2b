@@ -1,9 +1,31 @@
 const { getSupabase } = require('./utils/db');
 const { autenticar, ehAdmin } = require('./utils/auth');
 const { ok, fail, preflight, getClientIp } = require('./utils/http');
+const { PRODUTO } = require('../../public/js/produto.js');
 
 const STATUS_ADMIN_ONLY = ['VENDA_CONCLUIDA', 'PENDENTE_PAGAMENTO', 'NAO_EFETIVADA', 'CANCELADA'];
-const FORMAS_PAGAMENTO_PERMITIDAS = ['PIX', 'TRANSFERENCIA'];
+const FORMAS_PAGAMENTO_PERMITIDAS = ['PIX', 'TRANSFERENCIA', 'CARTAO'];
+
+// Confere se a quantidade e o valor total batem com a faixa de preço unitário
+// permitida (R$ 49,00 a R$ 89,00 — a vendedora decide o valor exato dentro
+// dessa faixa, sem depender da quantidade do pedido).
+// Retorna uma mensagem de erro (string) se algo estiver fora da regra, ou
+// null se estiver tudo certo.
+function validarQuantidadeEPreco(quantidade, valorTotal) {
+  const qtd = Number(quantidade) || 0;
+  const total = Number(valorTotal) || 0;
+
+  if (qtd < PRODUTO.quantidade_minima) {
+    return `Quantidade mínima é ${PRODUTO.quantidade_minima} unidades.`;
+  }
+
+  const precoUnitario = qtd > 0 ? total / qtd : 0;
+  if (precoUnitario < PRODUTO.preco_minimo || precoUnitario > PRODUTO.preco_maximo) {
+    return `Preço unitário de R$ ${precoUnitario.toFixed(2)} fora da faixa permitida (entre R$ ${PRODUTO.preco_minimo.toFixed(2)} e R$ ${PRODUTO.preco_maximo.toFixed(2)}).`;
+  }
+
+  return null;
+}
 
 async function registrarHistorico(supabase, usuario, pedidoId, acao, detalhes, ip) {
   await supabase.from('historico').insert({
@@ -103,6 +125,9 @@ exports.handler = async (event) => {
         return fail('Forma de pagamento inválida. Use PIX ou Transferência.', 400);
       }
 
+      const erroPreco = validarQuantidadeEPreco(body.quantidade || 1, body.valor_total);
+      if (erroPreco) return fail(erroPreco, 400);
+
       const cliente_id = await upsertCliente(supabase, body);
 
       const { data: pedido, error } = await supabase
@@ -145,6 +170,13 @@ exports.handler = async (event) => {
 
       if (body.forma_pagamento !== undefined && !FORMAS_PAGAMENTO_PERMITIDAS.includes(body.forma_pagamento)) {
         return fail('Forma de pagamento inválida. Use PIX ou Transferência.', 400);
+      }
+
+      if (body.quantidade !== undefined || body.valor_total !== undefined) {
+        const quantidadeFinal = body.quantidade !== undefined ? body.quantidade : atual.quantidade;
+        const valorTotalFinal = body.valor_total !== undefined ? body.valor_total : atual.valor_total;
+        const erroPreco = validarQuantidadeEPreco(quantidadeFinal, valorTotalFinal);
+        if (erroPreco) return fail(erroPreco, 400);
       }
 
       if (body.nome_empresa) {

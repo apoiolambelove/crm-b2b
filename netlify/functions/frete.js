@@ -1,10 +1,20 @@
 const { autenticar } = require('./utils/auth');
 const { ok, fail, preflight } = require('./utils/http');
 
-// Peso e caixa padrão do produto único (LambeLove - Pele e Pêlo 150g).
-// Mantido em sincronia com public/js/produto.js — se o produto mudar, ajuste os dois lugares.
-const PESO_UNITARIO_KG = 0.2;
-const CAIXA_PADRAO = { comprimento_cm: 40, largura_cm: 30, altura_cm: 20, tara_kg: 0.5 };
+// Medidas reais de UMA unidade do produto único da LambeLove (Pele e Pêlo),
+// já embalada e pronta pra postagem. Usadas para calcular o frete "por produtos":
+// o próprio Melhor Envio calcula automaticamente quantas caixas/volumes são
+// necessários para a quantidade do pedido (empacotamento automático), então o
+// frete sai correto tanto para pedidos pequenos quanto para pedidos grandes.
+// Mantido em sincronia com public/js/produto.js — se o produto mudar (tamanho,
+// peso ou preço), ajuste os dois lugares.
+const PRODUTO_UNITARIO = {
+  altura_cm: 10,
+  largura_cm: 10,
+  comprimento_cm: 10,
+  peso_kg: 0.2,        // 200g por unidade (peso real de envio)
+  valor_declarado: 59, // valor unitário usado no seguro do envio (insurance_value)
+};
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return preflight();
@@ -31,8 +41,6 @@ exports.handler = async (event) => {
   if (cepDestino.length !== 8) return fail('Informe um CEP de destino válido.', 400);
   if (quantidade <= 0) return fail('Informe a quantidade do pedido.', 400);
 
-  const pesoTotalKg = Math.round((quantidade * PESO_UNITARIO_KG + CAIXA_PADRAO.tara_kg) * 100) / 100;
-
   try {
     const resp = await fetch('https://www.melhorenvio.com.br/api/v2/me/shipment/calculate', {
       method: 'POST',
@@ -45,12 +53,17 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         from: { postal_code: cepOrigem },
         to: { postal_code: cepDestino },
-        package: {
-          height: CAIXA_PADRAO.altura_cm,
-          width: CAIXA_PADRAO.largura_cm,
-          length: CAIXA_PADRAO.comprimento_cm,
-          weight: pesoTotalKg,
-        },
+        products: [
+          {
+            id: 'lambelove-pele-pelo-200g',
+            width: PRODUTO_UNITARIO.largura_cm,
+            height: PRODUTO_UNITARIO.altura_cm,
+            length: PRODUTO_UNITARIO.comprimento_cm,
+            weight: PRODUTO_UNITARIO.peso_kg,
+            insurance_value: PRODUTO_UNITARIO.valor_declarado,
+            quantity: quantidade,
+          },
+        ],
       }),
     });
 

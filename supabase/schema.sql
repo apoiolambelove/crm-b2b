@@ -130,6 +130,13 @@ create table if not exists pagamentos_comissao (
 
 alter table pedidos add column if not exists pagamento_comissao_id uuid references pagamentos_comissao(id) on delete set null;
 
+-- ---------------------------------------------------------
+-- Integração de pagamento online (Mercado Pago / Checkout Pro)
+-- ---------------------------------------------------------
+alter table pedidos add column if not exists mp_preference_id text;
+alter table pedidos add column if not exists mp_payment_id text;
+alter table pedidos add column if not exists mp_status text;
+
 alter table pagamentos_comissao enable row level security;
 
 -- ---------------------------------------------------------
@@ -140,9 +147,11 @@ select
   p.*,
   c.nome_empresa, c.cnpj, c.inscricao_estadual, c.nome_socio,
   c.telefone, c.whatsapp, c.email, c.cep, c.endereco, c.numero,
-  c.complemento, c.bairro, c.cidade, c.estado
+  c.complemento, c.bairro, c.cidade, c.estado,
+  pc.status as status_pagamento_comissao
 from pedidos p
-join clientes c on c.id = p.cliente_id;
+join clientes c on c.id = p.cliente_id
+left join pagamentos_comissao pc on pc.id = p.pagamento_comissao_id;
 
 -- ---------------------------------------------------------
 -- Row Level Security: desabilitado pois o acesso é feito
