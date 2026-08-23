@@ -71,7 +71,12 @@ async function carregarUsuarios() {
         <td>${u.nome_completo}</td>
         <td>${u.perfil === 'ADMIN' ? 'Administrador' : 'Vendedora'}</td>
         <td>${u.ativo ? '<span class="badge-status st-concluida">Ativo</span>' : '<span class="badge-status st-cancelada">Inativo</span>'}</td>
-        <td><button class="icon-btn" onclick='abrirEdicao(${JSON.stringify(u)})' title="Editar / Resetar senha"><i class="fa-solid fa-pen"></i></button></td>
+        <td style="white-space:nowrap;">
+          <button class="icon-btn" onclick='abrirEdicao(${JSON.stringify(u)})' title="Editar / Resetar senha"><i class="fa-solid fa-pen"></i></button>
+          ${u.id === usuario.id ? '' : `
+          <button class="icon-btn" onclick='alternarAtivo(${JSON.stringify(u)})' title="${u.ativo ? 'Inativar' : 'Ativar'}"><i class="fa-solid ${u.ativo ? 'fa-user-slash' : 'fa-user-check'}"></i></button>
+          <button class="icon-btn" onclick="excluirUsuario('${u.id}', '${u.nome_usuario.replace(/'/g, "\\'")}')" title="Excluir" style="color:var(--coral);"><i class="fa-solid fa-trash"></i></button>`}
+        </td>
       </tr>`).join('');
   } catch (err) {
     corpo.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
@@ -106,6 +111,29 @@ function abrirEdicao(u) {
 }
 
 function fecharForm() { document.getElementById('cardForm').style.display = 'none'; }
+
+async function alternarAtivo(u) {
+  const acao = u.ativo ? 'inativar' : 'ativar';
+  if (!confirm(`Confirma ${acao} o usuário "${u.nome_usuario}"?`)) return;
+  try {
+    await api('usuarios', { method: 'PUT', body: { id: u.id, ativo: !u.ativo } });
+    toast(`Usuário ${u.ativo ? 'inativado' : 'ativado'}.`);
+    carregarUsuarios();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function excluirUsuario(id, nome) {
+  if (!confirm(`Excluir definitivamente o usuário "${nome}"? Essa ação não pode ser desfeita.`)) return;
+  try {
+    await api('usuarios', { method: 'DELETE', params: { id } });
+    toast('Usuário excluído.');
+    carregarUsuarios();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
 
 async function salvarUsuario(e) {
   e.preventDefault();

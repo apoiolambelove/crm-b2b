@@ -46,9 +46,13 @@ exports.handler = async (event) => {
     }
 
     if (event.httpMethod === 'PUT') {
-      // Editar dados do usuário e/ou resetar senha
+      // Editar dados do usuário, resetar senha e/ou ativar/inativar
       const body = JSON.parse(event.body || '{}');
       if (!body.id) return fail('Informe o id do usuário', 400);
+
+      if (typeof body.ativo === 'boolean' && body.ativo === false && body.id === usuario.id) {
+        return fail('Você não pode inativar seu próprio usuário.', 400);
+      }
 
       const updateData = {};
       if (body.nome_completo) updateData.nome_completo = body.nome_completo;
@@ -65,13 +69,48 @@ exports.handler = async (event) => {
         .single();
       if (error) throw error;
 
+      let acao = 'EDICAO_USUARIO';
+      let detalhes = `Usuário ${editado.nome_usuario} editado`;
+      if (typeof body.ativo === 'boolean') {
+        acao = body.ativo ? 'ATIVACAO_USUARIO' : 'INATIVACAO_USUARIO';
+        detalhes = `Usuário ${editado.nome_usuario} ${body.ativo ? 'ativado' : 'inativado'}`;
+      } else if (body.nova_senha) {
+        detalhes = `Senha de ${editado.nome_usuario} resetada`;
+      }
+
       await supabase.from('historico').insert({
         usuario_id: usuario.id, nome_usuario: usuario.nome_usuario,
-        acao: 'EDICAO_USUARIO',
-        detalhes: body.nova_senha ? `Senha de ${editado.nome_usuario} resetada` : `Usuário ${editado.nome_usuario} editado`,
-        ip,
+        acao, detalhes, ip,
       });
       return ok(editado);
+    }
+
+    if (event.httpMethod === 'DELETE') {
+      const params = event.queryStringParameters || {};
+      if (!params.id) return fail('ID do usuário não informado.', 400);
+      if (params.id === usuario.id) return fail('Você não pode excluir seu próprio usuário.', 400);
+
+      const { data: alvo } = await supabase
+        .from('usuarios')
+        .select('nome_usuario')
+        .eq('id', params.id)
+        .single();
+
+      const { error } = await supabase.from('usuarios').delete().eq('id', params.id);
+      if (error) {
+        if (error.code === '23503') {
+          return fail('Esse usuário já tem pedidos ou registros vinculados e não pode ser excluído. Inative-o em vez disso.', 409);
+        }
+        throw error;
+      }
+
+      await supabase.from('historico').insert({
+        usuario_id: usuario.id, nome_usuario: usuario.nome_usuario,
+        acao: 'EXCLUSAO_USUARIO',
+        detalhes: `Usuário ${alvo ? alvo.nome_usuario : params.id} excluído`,
+        ip,
+      });
+      return ok({ deletado: true });
     }
 
     return fail('Método não permitido', 405);
