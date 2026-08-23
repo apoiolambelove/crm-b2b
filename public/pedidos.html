@@ -67,9 +67,9 @@ if (usuario) {
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>Nº</th><th>Data</th><th>Empresa</th><th>Cidade</th><th>Valor</th><th>Frete</th><th>Pagamento</th><th>Status</th><th>Comissão</th><th></th>
+              <th>Nº</th><th>Data</th><th>Empresa</th><th>Cidade</th><th>Valor</th><th>Frete</th><th>Pagamento</th><th>Status</th><th>Comissão</th>${usuario.perfil === 'ADMIN' ? '<th>Vendedor</th>' : ''}<th></th>
             </tr></thead>
-            <tbody id="corpoTabela"><tr><td colspan="10" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</td></tr></tbody>
+            <tbody id="corpoTabela"><tr><td colspan="${usuario.perfil === 'ADMIN' ? 11 : 10}" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -104,12 +104,12 @@ async function pesquisar() {
     pedidosAtuais = dados;
     document.getElementById('totalResultados').textContent = `Pedidos (${dados.length})`;
     if (!dados.length) {
-      corpo.innerHTML = `<tr><td colspan="10"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Nenhum pedido encontrado com esses filtros.</div></td></tr>`;
+      corpo.innerHTML = `<tr><td colspan="${usuario.perfil === 'ADMIN' ? 11 : 10}"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Nenhum pedido encontrado com esses filtros.</div></td></tr>`;
       return;
     }
     corpo.innerHTML = dados.map(linhaPedido).join('');
   } catch (err) {
-    corpo.innerHTML = `<tr><td colspan="10"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
+    corpo.innerHTML = `<tr><td colspan="${usuario.perfil === 'ADMIN' ? 11 : 10}"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
   }
 }
 
@@ -134,6 +134,7 @@ function linhaPedido(p) {
       <td>${PAGAMENTO_LABEL[p.forma_pagamento] || p.forma_pagamento}</td>
       <td>${seletorStatus}</td>
       <td class="num">${formatarMoeda(p.valor_comissao)} <span style="font-size:10px; color:var(--ink-soft);">· ${tagComissao(p)}</span></td>
+      ${isAdmin ? `<td>${p.criado_por_nome || '-'}</td>` : ''}
       <td style="white-space:nowrap;">
         ${podeEditar ? `<a class="icon-btn" href="/novo-pedido.html?id=${p.id}" title="Editar"><i class="fa-solid fa-pen"></i></a>` : ''}
         <button class="icon-btn" onclick="gerarLinkPagamento('${p.id}')" title="Gerar link de pagamento (cartão)"><i class="fa-solid fa-credit-card"></i></button>

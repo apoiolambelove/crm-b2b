@@ -32,8 +32,8 @@ if (usuario) {
 
         <div class="table-wrap" style="margin-bottom:26px;">
           <table>
-            <thead><tr><th>Empresa</th><th>CNPJ</th><th>Telefone</th><th>Cidade/UF</th><th></th></tr></thead>
-            <tbody id="corpoClientes"><tr><td colspan="5" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</td></tr></tbody>
+            <thead><tr><th>Empresa</th><th>CNPJ</th><th>Telefone</th><th>Cidade/UF</th>${usuario.perfil === 'ADMIN' ? '<th>Vendedor</th>' : ''}<th></th></tr></thead>
+            <tbody id="corpoClientes"><tr><td colspan="${usuario.perfil === 'ADMIN' ? 6 : 5}" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</td></tr></tbody>
           </table>
         </div>
 
@@ -118,8 +118,9 @@ async function carregarClientes(busca) {
   corpo.innerHTML = `<tr><td colspan="5" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Buscando...</td></tr>`;
   try {
     const lista = await api('clientes' + (busca ? '?busca=' + encodeURIComponent(busca) : ''));
+    const isAdmin = usuario.perfil === 'ADMIN';
     if (!lista.length) {
-      corpo.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Nenhum cliente encontrado.</div></td></tr>`;
+      corpo.innerHTML = `<tr><td colspan="${isAdmin ? 6 : 5}"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Nenhum cliente encontrado.</div></td></tr>`;
       return;
     }
     corpo.innerHTML = lista.map((c) => `
@@ -128,13 +129,14 @@ async function carregarClientes(busca) {
         <td>${c.cnpj || '-'}</td>
         <td>${c.telefone || c.whatsapp || '-'}</td>
         <td>${c.cidade ? c.cidade + '/' + (c.estado || '') : '-'}</td>
+        ${isAdmin ? `<td>${c.criado_por_nome || '-'}</td>` : ''}
         <td>
           <button class="icon-btn" onclick='abrirEdicao(${JSON.stringify(c)})' title="Editar"><i class="fa-solid fa-pen"></i></button>
           <button class="icon-btn" onclick="excluirCliente('${c.id}', '${c.nome_empresa.replace(/'/g, "\\'")}')" title="Excluir" style="color:var(--coral);"><i class="fa-solid fa-trash"></i></button>
         </td>
       </tr>`).join('');
   } catch (err) {
-    corpo.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
+    corpo.innerHTML = `<tr><td colspan="${usuario.perfil === 'ADMIN' ? 6 : 5}"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
   }
 }
 

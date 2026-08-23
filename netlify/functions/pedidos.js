@@ -38,8 +38,10 @@ async function registrarHistorico(supabase, usuario, pedidoId, acao, detalhes, i
   });
 }
 
-async function upsertCliente(supabase, dados) {
+async function upsertCliente(supabase, dados, usuario) {
   // Tenta achar cliente existente pelo CNPJ; senão cria um novo.
+  // Tudo restrito aos clientes da própria vendedora (Admin não tem essa restrição).
+  const admin = ehAdmin(usuario);
   let clienteId = dados.cliente_id || null;
 
   const clienteDados = {
@@ -60,20 +62,28 @@ async function upsertCliente(supabase, dados) {
   };
 
   if (clienteId) {
+    // Confere se o cliente informado realmente pertence a quem está fazendo o pedido.
+    const { data: clienteAtual, error: checkErr } = await supabase.from('clientes').select('criado_por').eq('id', clienteId).maybeSingle();
+    if (checkErr) throw checkErr;
+    if (!clienteAtual) throw new Error('Cliente informado não encontrado.');
+    if (!admin && clienteAtual.criado_por !== usuario.id) throw new Error('Esse cliente não pertence a você.');
+
     const { error } = await supabase.from('clientes').update(clienteDados).eq('id', clienteId);
     if (error) throw error;
     return clienteId;
   }
 
   if (dados.cnpj) {
-    const { data: existente } = await supabase.from('clientes').select('id').eq('cnpj', dados.cnpj).maybeSingle();
+    let dupQuery = supabase.from('clientes').select('id').eq('cnpj', dados.cnpj);
+    if (!admin) dupQuery = dupQuery.eq('criado_por', usuario.id);
+    const { data: existente } = await dupQuery.maybeSingle();
     if (existente) {
       await supabase.from('clientes').update(clienteDados).eq('id', existente.id);
       return existente.id;
     }
   }
 
-  const { data: novo, error: insErr } = await supabase.from('clientes').insert(clienteDados).select('id').single();
+  const { data: novo, error: insErr } = await supabase.from('clientes').insert({ ...clienteDados, criado_por: usuario.id }).select('id').single();
   if (insErr) throw insErr;
   return novo.id;
 }
@@ -118,6 +128,14 @@ exports.handler = async (event) => {
 
       const { data, error } = await query.limit(500);
       if (error) throw error;
+
+      // Para o Administrador, anexa o nome de quem criou cada pedido.
+      if (ehAdmin(usuario) && data.length) {
+        const { data: usuariosLista } = await supabase.from('usuarios').select('id, nome_completo');
+        const nomesPorId = Object.fromEntries((usuariosLista || []).map((u) => [u.id, u.nome_completo]));
+        return ok(data.map((p) => ({ ...p, criado_por_nome: nomesPorId[p.criado_por] || '—' })));
+      }
+
       return ok(data);
     }
 
@@ -134,7 +152,7 @@ exports.handler = async (event) => {
       const erroPreco = validarQuantidadeEPreco(body.quantidade || 1, body.valor_total);
       if (erroPreco) return fail(erroPreco, 400);
 
-      const cliente_id = await upsertCliente(supabase, body);
+      const cliente_id = await upsertCliente(supabase, body, usuario);
 
       const { data: pedido, error } = await supabase
         .from('pedidos')
@@ -192,7 +210,7 @@ exports.handler = async (event) => {
       }
 
       if (body.nome_empresa) {
-        await upsertCliente(supabase, { ...body, cliente_id: atual.cliente_id });
+        await upsertCliente(supabase, { ...body, cliente_id: atual.cliente_id }, usuario);
       }
 
       const camposEditaveis = ['data_pedido', 'hora_pedido', 'produtos', 'quantidade', 'valor_total', 'valor_frete', 'forma_pagamento', 'observacoes'];

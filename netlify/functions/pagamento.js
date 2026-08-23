@@ -1,5 +1,5 @@
 const { getSupabase } = require('./utils/db');
-const { autenticar } = require('./utils/auth');
+const { autenticar, ehAdmin } = require('./utils/auth');
 const { ok, fail, preflight } = require('./utils/http');
 
 // Cria um link de pagamento (Checkout Pro) no Mercado Pago pra um pedido já
@@ -32,11 +32,14 @@ exports.handler = async (event) => {
   const supabase = getSupabase();
   const { data: pedido, error } = await supabase
     .from('vw_pedidos')
-    .select('id, numero_pedido, nome_empresa, valor_total, produtos, email')
+    .select('id, numero_pedido, nome_empresa, valor_total, produtos, email, criado_por')
     .eq('id', pedidoId)
     .single();
 
   if (error || !pedido) return fail('Pedido não encontrado.', 404);
+  if (!ehAdmin(usuario) && pedido.criado_por !== usuario.id) {
+    return fail('Você não tem permissão para gerar cobrança para este pedido.', 403);
+  }
   if (!pedido.valor_total || Number(pedido.valor_total) <= 0) {
     return fail('Esse pedido não tem um valor total válido para gerar cobrança.', 400);
   }

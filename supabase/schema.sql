@@ -46,6 +46,11 @@ create table if not exists clientes (
 create index if not exists idx_clientes_cnpj on clientes (cnpj);
 create index if not exists idx_clientes_cidade on clientes (cidade);
 
+-- Dono do cadastro (cada vendedora só vê/edita os clientes que ela criou;
+-- o Administrador vê todos e sabe de quem é cada um).
+alter table clientes add column if not exists criado_por uuid references usuarios(id);
+create index if not exists idx_clientes_criado_por on clientes (criado_por);
+
 -- ---------------------------------------------------------
 -- PEDIDOS
 -- ---------------------------------------------------------
