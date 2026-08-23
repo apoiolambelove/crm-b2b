@@ -120,6 +120,32 @@ exports.handler = async (event) => {
       return ok(data);
     }
 
+    // ---------- DELETE: Admin cancela um pagamento lançado por engano ----------
+    // Só é permitido enquanto a vendedora ainda não confirmou o recebimento
+    // (status AGUARDANDO_ACEITE). Depois de ACEITO, é dinheiro já confirmado
+    // como pago e não pode ser apagado por aqui — evita histórico inconsistente.
+    if (event.httpMethod === 'DELETE') {
+      if (!ehAdmin(usuario)) return fail('Apenas o administrador pode cancelar um lançamento de comissão.', 403);
+
+      const params = event.queryStringParameters || {};
+      if (!params.id) return fail('Informe o id do pagamento.', 400);
+
+      const { data: pagamento, error: e1 } = await supabase.from('pagamentos_comissao').select('*').eq('id', params.id).maybeSingle();
+      if (e1) throw e1;
+      if (!pagamento) return fail('Pagamento não encontrado.', 404);
+      if (pagamento.status === 'ACEITO') {
+        return fail('Esse pagamento já foi confirmado pela vendedora e não pode mais ser cancelado por aqui.', 409);
+      }
+
+      const { error: e2 } = await supabase.from('pedidos').update({ pagamento_comissao_id: null }).eq('pagamento_comissao_id', params.id);
+      if (e2) throw e2;
+
+      const { error: e3 } = await supabase.from('pagamentos_comissao').delete().eq('id', params.id);
+      if (e3) throw e3;
+
+      return ok({ cancelado: true });
+    }
+
     return fail('Método não permitido', 405);
   } catch (e) {
     return fail('Erro no servidor: ' + e.message, 500);

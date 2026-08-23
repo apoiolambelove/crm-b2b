@@ -234,6 +234,33 @@ exports.handler = async (event) => {
       if (!ehAdmin(usuario)) return fail('Apenas o administrador pode alterar o status do pedido.', 403);
       if (!STATUS_ADMIN_ONLY.includes(body.status)) return fail('Status inválido', 400);
 
+      const { data: pedidoAtual, error: getErr } = await supabase
+        .from('pedidos')
+        .select('id, numero_pedido, status, pagamento_comissao_id')
+        .eq('id', body.id)
+        .maybeSingle();
+      if (getErr) throw getErr;
+      if (!pedidoAtual) return fail('Pedido não encontrado', 404);
+
+      // Trava de segurança: um pedido com comissão já lançada (ou já paga/confirmada)
+      // não pode ter o status alterado por baixo do pagamento — isso deixaria o
+      // pedido "pendente" com dinheiro já pago registrado nele. Resolva o
+      // pagamento (aba Comissões) antes de mudar o status.
+      if (pedidoAtual.pagamento_comissao_id && body.status !== pedidoAtual.status) {
+        const { data: pagamentoVinculado } = await supabase
+          .from('pagamentos_comissao')
+          .select('status')
+          .eq('id', pedidoAtual.pagamento_comissao_id)
+          .maybeSingle();
+        if (pagamentoVinculado) {
+          const situacao = pagamentoVinculado.status === 'ACEITO' ? 'já paga e confirmada' : 'lançada, aguardando confirmação';
+          return fail(
+            `Este pedido tem uma comissão ${situacao}. Não é possível mudar o status sem resolver o pagamento vinculado primeiro.`,
+            409
+          );
+        }
+      }
+
       const { data: pedido, error } = await supabase
         .from('pedidos')
         .update({ status: body.status })

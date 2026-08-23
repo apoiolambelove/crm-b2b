@@ -64,7 +64,7 @@ if (usuario) {
             <h3 style="font-size:15px; margin-top:0;">Histórico de Pagamentos</h3>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Período</th>${usuario.perfil === 'ADMIN' ? '<th>Vendedora</th>' : ''}<th>Valor</th><th>Status</th><th>Lançado em</th><th>Confirmado em</th></tr></thead>
+                <thead><tr><th>Período</th>${usuario.perfil === 'ADMIN' ? '<th>Vendedora</th>' : ''}<th>Valor</th><th>Status</th><th>Lançado em</th><th>Confirmado em</th>${usuario.perfil === 'ADMIN' ? '<th></th>' : ''}</tr></thead>
                 <tbody id="corpoHistorico"><tr><td colspan="6" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</td></tr></tbody>
               </table>
             </div>
@@ -219,7 +219,7 @@ async function carregarResumoMensal() {
 // ---------- Histórico ----------
 async function carregarHistorico() {
   const corpo = document.getElementById('corpoHistorico');
-  const colspan = usuario.perfil === 'ADMIN' ? 6 : 5;
+  const colspan = usuario.perfil === 'ADMIN' ? 7 : 5;
   try {
     const lista = await api('comissoes?historico=1');
     if (!lista.length) {
@@ -234,9 +234,23 @@ async function carregarHistorico() {
         <td>${p.status === 'ACEITO' ? '<span class="badge-status st-concluida">Pago (Confirmado)</span>' : '<span class="badge-status st-aguardando">Aguardando Confirmação</span>'}</td>
         <td>${formatarDataHora(p.criado_em)}</td>
         <td>${formatarDataHora(p.aceito_em)}</td>
+        ${usuario.perfil === 'ADMIN' ? `<td>${p.status !== 'ACEITO' ? `<button class="icon-btn" onclick="cancelarPagamento('${p.id}')" title="Cancelar lançamento" style="color:var(--coral);"><i class="fa-solid fa-rotate-left"></i></button>` : ''}</td>` : ''}
       </tr>`).join('');
   } catch (err) {
     corpo.innerHTML = `<tr><td colspan="${colspan}"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
+  }
+}
+
+async function cancelarPagamento(id) {
+  if (!confirm('Cancelar esse lançamento de comissão? Os pedidos vinculados voltam a ficar disponíveis para um novo lançamento.')) return;
+  try {
+    await api('comissoes?id=' + id, { method: 'DELETE' });
+    toast('Lançamento cancelado.', 'success');
+    carregarHistorico();
+    carregarPendentes();
+    carregarResumoMensal();
+  } catch (err) {
+    toast(err.message, 'error');
   }
 }
 </script>
