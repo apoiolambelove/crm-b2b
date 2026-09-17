@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consignação · LambeLove</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap-grid.min.css">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="app-shell" id="shell"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/ui.js"></script>
+<script>
+const usuario = protegerPagina();
+const isAdmin = usuario && usuario.perfil === 'ADMIN';
+
+if (usuario) {
+  document.getElementById('shell').innerHTML = `
+    ${montarShell('consignacao', usuario)}
+    <main class="main">
+      ${montarTopbar('Consignação', 'Estoque entregue às vendedoras e repasse semanal (toda quarta-feira)')}
+      <div class="content">
+
+        ${isAdmin ? `
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-body">
+            <h3 style="font-size:15px; margin-top:0;">Registrar Entrega de Produto</h3>
+            <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-6px;">Lance aqui a quantidade que você entregou fisicamente para a vendedora. O estoque dela some sozinho conforme os pedidos forem marcados como "Venda Concluída".</p>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label class="form-label">Vendedora</label>
+                <select class="form-select" id="entregaVendedora"></select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Quantidade (unidades)</label>
+                <input type="number" min="1" class="form-control" id="entregaQuantidade">
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Observação (opcional)</label>
+                <input class="form-control" id="entregaObservacao" placeholder="Ex: entrega de 09/09">
+              </div>
+              <div class="col-md-2" style="align-self:flex-end;">
+                <button class="btn-brand" style="width:100%;" onclick="registrarEntrega()"><i class="fa-solid fa-truck-loading"></i> Registrar</button>
+              </div>
+            </div>
+          </div>
+        </div>` : ''}
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-body">
+            <h3 style="font-size:15px; margin-top:0;">Estoque em Consignação</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Vendedora</th><th>Entregue</th><th>Vendido</th><th>Estoque Atual</th></tr></thead>
+                <tbody id="corpoEstoque"><tr><td colspan="4" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-body">
+            <h3 style="font-size:15px; margin-top:0;">${isAdmin ? 'Fechamento Semanal — Valor a Repassar' : 'Seu Valor a Repassar (semana atual)'}</h3>
+            <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-6px;">
+              ${isAdmin
+                ? 'Soma dos pedidos "Venda Concluída" ainda não fechados. A vendedora retém a comissão e repassa o restante. Feche a semana toda quarta-feira.'
+                : 'Soma dos seus pedidos "Venda Concluída" ainda não fechados nesta semana. Você retém sua comissão e repassa o restante para a empresa toda quarta-feira.'}
+            </p>
+            <div id="areaPendentes"><div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <h3 style="font-size:15px; margin-top:0;">Histórico de Repasses</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Período</th>${isAdmin ? '<th>Vendedora</th>' : ''}<th>Vendido</th><th>Comissão Retida</th><th>Repassado</th><th>Status</th><th>Fechado em</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+                <tbody id="corpoRepasses"><tr><td colspan="8" class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>`;
+
+  carregarEstoque();
+  carregarPendentes();
+  carregarRepasses();
+  if (isAdmin) carregarVendedorasParaSelect();
+}
+
+function formatarMoeda(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
+function formatarDataBR(d) { if (!d) return '-'; const [a, m, dia] = d.split('-'); return `${dia}/${m}/${a}`; }
+function formatarDataHora(iso) { if (!iso) return '-'; return new Date(iso).toLocaleString('pt-BR'); }
+
+function periodoPadrao() {
+  const hoje = new Date();
+  const diaSemana = hoje.getDay(); // 0=domingo ... 3=quarta
+  const diffParaQuarta = (diaSemana - 3 + 7) % 7;
+  const fim = new Date(hoje); fim.setDate(hoje.getDate() - diffParaQuarta);
+  const inicio = new Date(fim); inicio.setDate(fim.getDate() - 6);
+  const iso = (d) => d.toISOString().slice(0, 10);
+  return { inicio: iso(inicio), fim: iso(fim) };
+}
+
+// ---------- Estoque ----------
+async function carregarEstoque() {
+  const corpo = document.getElementById('corpoEstoque');
+  try {
+    const lista = await api('consignacao?estoque=1');
+    if (!lista.length) {
+      corpo.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Nenhuma vendedora cadastrada ainda.</div></td></tr>`;
+      return;
+    }
+    corpo.innerHTML = lista.map((v) => `
+      <tr>
+        <td>${v.nome_completo}${v.ativo === false ? ' <span style="color:var(--ink-soft); font-size:11px;">(inativa)</span>' : ''}</td>
+        <td class="num">${v.total_entregue}</td>
+        <td class="num">${v.total_vendido}</td>
+        <td class="num" style="font-weight:700; color:${v.estoque_atual <= 0 ? 'var(--coral)' : 'var(--primary)'};">${v.estoque_atual}</td>
+      </tr>`).join('');
+  } catch (err) {
+    corpo.innerHTML = `<tr><td colspan="4"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
+  }
+}
+
+async function carregarVendedorasParaSelect() {
+  const select = document.getElementById('entregaVendedora');
+  if (!select) return;
+  try {
+    const lista = await api('consignacao?estoque=1');
+    select.innerHTML = lista.map((v) => `<option value="${v.vendedora_id}">${v.nome_completo}</option>`).join('') || '<option value="">Nenhuma vendedora</option>';
+  } catch (err) {
+    select.innerHTML = '<option value="">Erro ao carregar</option>';
+  }
+}
+
+async function registrarEntrega() {
+  const vendedora_id = document.getElementById('entregaVendedora').value;
+  const quantidade = document.getElementById('entregaQuantidade').value;
+  const observacao = document.getElementById('entregaObservacao').value;
+  if (!vendedora_id) return toast('Selecione uma vendedora.', 'error');
+  if (!quantidade || Number(quantidade) <= 0) return toast('Informe uma quantidade válida.', 'error');
+
+  try {
+    await api('consignacao', { method: 'POST', body: { tipo: 'ENTREGA', vendedora_id, quantidade, observacao } });
+    toast('Entrega registrada! Estoque atualizado.', 'success');
+    document.getElementById('entregaQuantidade').value = '';
+    document.getElementById('entregaObservacao').value = '';
+    carregarEstoque();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ---------- Pendentes / Fechamento ----------
+async function carregarPendentes() {
+  const area = document.getElementById('areaPendentes');
+  try {
+    const lista = await api('consignacao?pendentes=1');
+    if (!lista.length) {
+      area.innerHTML = `<div class="empty-state"><i class="fa-solid fa-circle-check"></i>Nada pendente de repasse no momento.</div>`;
+      return;
+    }
+    const { inicio, fim } = periodoPadrao();
+    area.innerHTML = lista.map((g, i) => `
+      <div class="card" style="margin-bottom:12px; border-color:var(--amber);">
+        <div class="card-body">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div>
+              <strong style="font-size:14.5px;">${g.nome_completo}</strong>
+              <div style="font-size:12.5px; color:var(--ink-soft); margin-top:4px;">
+                Vendido: <strong>${formatarMoeda(g.valor_vendido)}</strong> &nbsp;·&nbsp;
+                Comissão retida: <strong>${formatarMoeda(g.valor_comissao)}</strong> &nbsp;·&nbsp;
+                A repassar: <strong style="color:var(--primary);">${formatarMoeda(g.valor_repassar)}</strong>
+                &nbsp;·&nbsp; ${g.pedidos.length} pedido(s)
+              </div>
+            </div>
+            ${isAdmin ? `
+            <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+              <div><label class="form-label">Início</label><input type="date" class="form-control" id="inicio-${i}" value="${inicio}"></div>
+              <div><label class="form-label">Fim (quarta)</label><input type="date" class="form-control" id="fim-${i}" value="${fim}"></div>
+              <button class="btn-brand" onclick="fecharSemana('${g.vendedora_id}', ${i})"><i class="fa-solid fa-lock"></i> Fechar Semana</button>
+            </div>` : ''}
+          </div>
+        </div>
+      </div>`).join('');
+  } catch (err) {
+    area.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div>`;
+  }
+}
+
+async function fecharSemana(vendedora_id, i) {
+  const periodo_inicio = document.getElementById(`inicio-${i}`).value;
+  const periodo_fim = document.getElementById(`fim-${i}`).value;
+  if (!periodo_inicio || !periodo_fim) return toast('Informe o período.', 'error');
+  if (!confirm('Fechar a semana dessa vendedora? Os pedidos do período entram nesse repasse e não poderão mais ter o status alterado.')) return;
+
+  try {
+    await api('consignacao', { method: 'POST', body: { tipo: 'FECHAR_SEMANA', vendedora_id, periodo_inicio, periodo_fim } });
+    toast('Semana fechada! Repasse gerado.', 'success');
+    carregarPendentes();
+    carregarRepasses();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+// ---------- Histórico de repasses ----------
+async function carregarRepasses() {
+  const corpo = document.getElementById('corpoRepasses');
+  const colspan = isAdmin ? 8 : 6;
+  try {
+    const lista = await api('consignacao?repasses=1');
+    if (!lista.length) {
+      corpo.innerHTML = `<tr><td colspan="${colspan}"><div class="empty-state"><i class="fa-solid fa-inbox"></i>Nenhum repasse fechado ainda.</div></td></tr>`;
+      return;
+    }
+    corpo.innerHTML = lista.map((r) => `
+      <tr>
+        <td>${formatarDataBR(r.periodo_inicio)} a ${formatarDataBR(r.periodo_fim)}</td>
+        ${isAdmin ? `<td>${r.usuarios?.nome_completo || '-'}</td>` : ''}
+        <td class="num">${formatarMoeda(r.valor_vendido)}</td>
+        <td class="num">${formatarMoeda(r.valor_comissao)}</td>
+        <td class="num" style="font-weight:600;">${formatarMoeda(r.valor_repassar)}</td>
+        <td>${r.status === 'RECEBIDO' ? '<span class="badge-status st-concluida">Recebido</span>' : '<span class="badge-status st-aguardando">Pendente</span>'}</td>
+        <td>${formatarDataHora(r.criado_em)}</td>
+        ${isAdmin ? `<td style="white-space:nowrap;">
+          ${r.status !== 'RECEBIDO' ? `<button class="icon-btn" onclick="confirmarRecebimento('${r.id}')" title="Confirmar recebimento" style="color:var(--primary);"><i class="fa-solid fa-check"></i></button>
+          <button class="icon-btn" onclick="cancelarRepasse('${r.id}')" title="Cancelar fechamento" style="color:var(--coral);"><i class="fa-solid fa-rotate-left"></i></button>` : ''}
+        </td>` : ''}
+      </tr>`).join('');
+  } catch (err) {
+    corpo.innerHTML = `<tr><td colspan="${colspan}"><div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>${err.message}</div></td></tr>`;
+  }
+}
+
+async function confirmarRecebimento(id) {
+  if (!confirm('Confirmar que a empresa recebeu esse repasse da vendedora?')) return;
+  try {
+    await api('consignacao', { method: 'PUT', body: { id } });
+    toast('Recebimento confirmado!', 'success');
+    carregarRepasses();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+
+async function cancelarRepasse(id) {
+  if (!confirm('Cancelar esse fechamento? Os pedidos vinculados voltam a ficar pendentes de repasse.')) return;
+  try {
+    await api('consignacao?id=' + id, { method: 'DELETE' });
+    toast('Fechamento cancelado.', 'success');
+    carregarRepasses();
+    carregarPendentes();
+  } catch (err) {
+    toast(err.message, 'error');
+  }
+}
+</script>
+</body>
+</html>
