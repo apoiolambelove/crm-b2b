@@ -203,7 +203,6 @@ function configurarProduto() {
   document.getElementById('produtos').value = PRODUTO.nome;
   document.getElementById('produtoNome').textContent = PRODUTO.nome;
   document.getElementById('produtoSugestao').textContent = 'R$ ' + PRODUTO.preco_padrao.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-  document.getElementById('qtdMinimaLabel').textContent = PRODUTO.quantidade_minima;
 
   const qtdInput = document.getElementById('quantidade');
   const precoInput = document.getElementById('preco_unitario');
