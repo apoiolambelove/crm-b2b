@@ -19,7 +19,7 @@ if (usuario) {
   document.getElementById('shell').innerHTML = `
     ${montarShell('usuarios', usuario)}
     <main class="main">
-      ${montarTopbar('Usuários', 'Cadastre novos vendedores/administradores e gerencie senhas')}
+      ${montarTopbar('Usuários', 'Cadastre novos vendedores e administradores')}
       <div class="content">
         <div class="section-head">
           <h2>Equipe</h2>
@@ -46,8 +46,8 @@ if (usuario) {
                 <option value="VENDEDORA">Vendedora</option>
                 <option value="ADMIN">Administrador</option>
               </select>
-              <label class="form-label" id="labelSenha">Senha</label>
-              <input type="text" class="form-control" id="senha" style="margin-bottom:16px;" placeholder="Deixe em branco para não alterar">
+              <label class="form-label" id="labelSenha">Senha inicial</label>
+              <input type="password" class="form-control" id="senha" style="margin-bottom:16px;" placeholder="Informe a senha inicial">
               <div style="display:flex; gap:8px;">
                 <button type="submit" class="btn-brand"><i class="fa-solid fa-floppy-disk"></i> Salvar</button>
                 <button type="button" class="btn-outline" onclick="fecharForm()">Cancelar</button>
@@ -72,7 +72,7 @@ async function carregarUsuarios() {
         <td>${u.perfil === 'ADMIN' ? 'Administrador' : 'Vendedora'}</td>
         <td>${u.ativo ? '<span class="badge-status st-concluida">Ativo</span>' : '<span class="badge-status st-cancelada">Inativo</span>'}</td>
         <td style="white-space:nowrap;">
-          <button class="icon-btn" onclick='abrirEdicao(${JSON.stringify(u)})' title="Editar / Resetar senha"><i class="fa-solid fa-pen"></i></button>
+          <button class="icon-btn" onclick='abrirEdicao(${JSON.stringify(u)})' title="Editar usuário"><i class="fa-solid fa-pen"></i></button>
           ${u.id === usuario.id ? '' : `
           <button class="icon-btn" onclick='alternarAtivo(${JSON.stringify(u)})' title="${u.ativo ? 'Inativar' : 'Ativar'}"><i class="fa-solid ${u.ativo ? 'fa-user-slash' : 'fa-user-check'}"></i></button>
           <button class="icon-btn" onclick="excluirUsuario('${u.id}', '${u.nome_usuario.replace(/'/g, "\\'")}')" title="Excluir" style="color:var(--coral);"><i class="fa-solid fa-trash"></i></button>`}
@@ -91,8 +91,9 @@ function abrirNovo() {
   document.getElementById('nome_completo').value = '';
   document.getElementById('perfil').value = 'VENDEDORA';
   document.getElementById('senha').value = '';
-  document.getElementById('senha').placeholder = 'Senha inicial';
-  document.getElementById('labelSenha').textContent = 'Senha';
+  document.getElementById('senha').placeholder = 'Informe a senha inicial';
+  document.getElementById('labelSenha').textContent = 'Senha inicial';
+  document.getElementById('senha').disabled = false;
   document.getElementById('cardForm').style.display = 'block';
 }
 
@@ -104,8 +105,9 @@ function abrirEdicao(u) {
   document.getElementById('nome_completo').value = u.nome_completo;
   document.getElementById('perfil').value = u.perfil;
   document.getElementById('senha').value = '';
-  document.getElementById('senha').placeholder = 'Deixe em branco para não alterar';
-  document.getElementById('labelSenha').textContent = 'Resetar Senha (opcional)';
+  document.getElementById('senha').placeholder = 'Senha não pode ser alterada aqui';
+  document.getElementById('labelSenha').textContent = 'Senha';
+  document.getElementById('senha').disabled = true;
   document.getElementById('cardForm').style.display = 'block';
   window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 }
@@ -144,7 +146,6 @@ async function salvarUsuario(e) {
         id,
         nome_completo: document.getElementById('nome_completo').value.trim(),
         perfil: document.getElementById('perfil').value,
-        nova_senha: document.getElementById('senha').value || undefined,
       }});
       toast('Usuário atualizado.');
     } else {

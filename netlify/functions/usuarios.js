@@ -46,7 +46,7 @@ exports.handler = async (event) => {
     }
 
     if (event.httpMethod === 'PUT') {
-      // Editar dados do usuário, resetar senha e/ou ativar/inativar
+      // Editar dados do usuário e/ou ativar/inativar
       const body = JSON.parse(event.body || '{}');
       if (!body.id) return fail('Informe o id do usuário', 400);
 
@@ -58,7 +58,6 @@ exports.handler = async (event) => {
       if (body.nome_completo) updateData.nome_completo = body.nome_completo;
       if (body.perfil) updateData.perfil = body.perfil;
       if (typeof body.ativo === 'boolean') updateData.ativo = body.ativo;
-      if (body.nova_senha) updateData.senha_hash = await bcrypt.hash(body.nova_senha, 10);
       updateData.atualizado_em = new Date().toISOString();
 
       const { data: editado, error } = await supabase
@@ -74,8 +73,6 @@ exports.handler = async (event) => {
       if (typeof body.ativo === 'boolean') {
         acao = body.ativo ? 'ATIVACAO_USUARIO' : 'INATIVACAO_USUARIO';
         detalhes = `Usuário ${editado.nome_usuario} ${body.ativo ? 'ativado' : 'inativado'}`;
-      } else if (body.nova_senha) {
-        detalhes = `Senha de ${editado.nome_usuario} resetada`;
       }
 
       await supabase.from('historico').insert({

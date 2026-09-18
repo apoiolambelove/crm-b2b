@@ -24,8 +24,7 @@ async function seedInicial(supabase) {
         nome_usuario: u.nome_usuario, 
         nome_completo: u.nome_completo, 
         senha_hash, 
-        perfil: u.perfil,
-        primeira_vez_login: true 
+        perfil: u.perfil
       });
     if (insErr) throw insErr;
   }
@@ -68,7 +67,7 @@ exports.handler = async (event) => {
       usuario_id: usuario.id,
       nome_usuario: usuario.nome_usuario,
       acao: 'LOGIN',
-      detalhes: usuario.primeira_vez_login ? 'Login realizado - primeira vez' : 'Login realizado com sucesso',
+      detalhes: 'Login realizado com sucesso',
       ip: getClientIp(event),
     });
 
@@ -79,9 +78,7 @@ exports.handler = async (event) => {
         nome_usuario: usuario.nome_usuario,
         nome_completo: usuario.nome_completo,
         perfil: usuario.perfil,
-        primeira_vez_login: usuario.primeira_vez_login,
       },
-      precisa_alterar_senha: usuario.primeira_vez_login,
     });
   } catch (e) {
     return fail('Erro no servidor: ' + e.message, 500);
