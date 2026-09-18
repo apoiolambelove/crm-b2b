@@ -28,7 +28,7 @@ if (usuario) {
         <div class="card" style="margin-bottom:20px;">
           <div class="card-body">
             <h3 style="font-size:15px; margin-top:0;">Registrar Entrega de Produto</h3>
-            <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-6px;">Lance aqui a quantidade que você entregou fisicamente para a vendedora. O estoque dela some sozinho conforme os pedidos forem marcados como "Venda Concluída".</p>
+            <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-6px;">Lance aqui a quantidade que você entregou fisicamente para a vendedora. O estoque dela é baixado automaticamente no momento em que uma venda de consignação é cadastrada. Se a venda for cancelada ou deixar de ser consignação, o estoque é estornado automaticamente.</p>
             <div class="row g-3">
               <div class="col-md-4">
                 <label class="form-label">Vendedora</label>
@@ -66,7 +66,7 @@ if (usuario) {
             <h3 style="font-size:15px; margin-top:0;">${isAdmin ? 'Fechamento Semanal — Valor a Repassar' : 'Seu Valor a Repassar (semana atual)'}</h3>
             <p style="font-size:12.5px; color:var(--ink-soft); margin-top:-6px;">
               ${isAdmin
-                ? 'Soma dos pedidos "Venda Concluída" ainda não fechados. A vendedora retém a comissão e repassa o restante. Feche a semana toda quarta-feira.'
+                ? 'Soma das vendas de consignação "Venda Concluída" ainda não fechadas. A vendedora retém a comissão e repassa o restante. Feche a semana toda quarta-feira.'
                 : 'Soma dos seus pedidos "Venda Concluída" ainda não fechados nesta semana. Você retém sua comissão e repassa o restante para a empresa toda quarta-feira.'}
             </p>
             <div id="areaPendentes"><div class="empty-state"><i class="fa-solid fa-spinner fa-spin"></i>Carregando...</div></div>

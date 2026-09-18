@@ -59,6 +59,23 @@ if (usuario) {
             <div class="col-md-1"><label class="form-label">UF</label><input class="form-control" id="estado" maxlength="2"></div>
           </div>
 
+          <div class="form-section-title"><i class="fa-solid fa-route"></i> Origem do Pedido</div>
+          <div class="row g-3">
+            <div class="col-12">
+              <div class="origem-pedido-grid">
+                <label class="origem-pedido-card">
+                  <input type="radio" name="origem_pedido" id="origem_matriz" value="MATRIZ" checked>
+                  <span><i class="fa-solid fa-building"></i><strong>Matriz</strong><small>Pedido separado e enviado pela empresa.</small></span>
+                </label>
+                <label class="origem-pedido-card">
+                  <input type="radio" name="origem_pedido" id="origem_consignacao" value="CONSIGNACAO">
+                  <span><i class="fa-solid fa-box-open"></i><strong>Consignação</strong><small>A vendedora já tem o produto e faz a entrega na hora da venda.</small></span>
+                </label>
+              </div>
+              <div id="origemPedidoAviso" class="origem-pedido-aviso">Na consignação, o estoque da vendedora é baixado automaticamente no momento em que o pedido é salvo. Se o pedido for cancelado ou deixar de ser uma consignação, o estoque é estornado automaticamente.</div>
+            </div>
+          </div>
+
           <div class="form-section-title"><i class="fa-solid fa-cart-shopping"></i> Produto</div>
           <div class="row g-3">
             <div class="col-12">
@@ -66,21 +83,21 @@ if (usuario) {
                 <img src="/img/logo.png" alt="produto">
                 <div class="product-info">
                   <div class="product-name" id="produtoNome"></div>
-                  <div class="product-suggestion">Preço sugerido: <strong id="produtoSugestao"></strong> — valor livre por enquanto, ajuste conforme a negociação</div>
+                  <div class="product-suggestion">Preço padrão: <strong id="produtoSugestao"></strong> — referência: R$ 59,00/un.; acima de 50 un., sugestão de R$ 49,00/un. (valor pode ser alterado).</div>
                 </div>
                 <i class="fa-solid fa-circle-check product-check"></i>
               </div>
               <input type="hidden" id="produtos">
             </div>
             <div class="col-md-3">
-              <label class="form-label">Quantidade (mín. <span id="qtdMinimaLabel"></span>) *</label>
+              <label class="form-label">Quantidade *</label>
               <input type="number" class="form-control" id="quantidade" required>
-              <div id="quantidadeAviso" style="font-size:11.5px; color:var(--coral); margin-top:4px; display:none;">Informe uma quantidade válida.</div>
+              <div id="quantidadeAviso" style="font-size:11.5px; color:var(--muted, #777); margin-top:4px; display:none;">Referência comercial: pedido mínimo sugerido de 10 unidades. Essa referência não bloqueia o pedido.</div>
             </div>
             <div class="col-md-3">
               <label class="form-label">Preço Unitário (R$) *</label>
               <input class="form-control" id="preco_unitario" required>
-              <div id="precoAviso" style="font-size:11.5px; color:var(--coral); margin-top:4px; display:none;">Informe um preço válido.</div>
+              <div id="precoAviso" style="font-size:11.5px; color:var(--muted, #777); margin-top:4px; display:none;">Referência de preço: R$ 59,00/un.; acima de 50 unidades, sugestão de R$ 49,00/un. O valor pode ser alterado.</div>
             </div>
             <div class="col-md-3"><label class="form-label">Valor Total (R$)</label><input class="form-control" id="valor_total" readonly style="background:var(--bg-soft, #f4f4f4);"></div>
             <div class="col-md-3">
@@ -137,6 +154,7 @@ if (usuario) {
   aplicarMascaraEmTempoReal(document.getElementById('preco_unitario'), mascararMoeda);
   configurarCep();
   configurarProduto();
+  configurarOrigemPedido();
   configurarAutocompleteCliente();
 
   const colPolitica = document.getElementById('colPoliticaFrete');
@@ -147,6 +165,38 @@ if (usuario) {
   }
 
   if (idEdicao) carregarPedidoParaEdicao(idEdicao);
+}
+
+function configurarOrigemPedido() {
+  const radios = document.querySelectorAll('input[name="origem_pedido"]');
+  const aviso = document.getElementById('origemPedidoAviso');
+  const atualizar = () => {
+    const origem = document.querySelector('input[name="origem_pedido"]:checked')?.value || 'MATRIZ';
+    document.querySelectorAll('.origem-pedido-card').forEach((card) => {
+      const input = card.querySelector('input');
+      card.classList.toggle('selected', input?.checked);
+    });
+    if (aviso) aviso.style.display = origem === 'CONSIGNACAO' ? 'block' : 'none';
+    if (origem === 'CONSIGNACAO') {
+      // Na consignação a entrega é feita pela própria vendedora. O frete da matriz não é aplicado.
+      freteBrutoAtual = 0;
+      const frete = document.getElementById('valor_frete');
+      if (frete) frete.value = '0,00';
+      const opcoes = document.getElementById('freteOpcoes');
+      const status = document.getElementById('freteStatus');
+      if (opcoes) { opcoes.style.display = 'none'; opcoes.innerHTML = ''; }
+      if (status) status.textContent = 'Consignação: entrega imediata pela vendedora. Frete da matriz não se aplica.';
+      atualizarTotalGeral();
+    } else {
+      limparFrete();
+    }
+  };
+  radios.forEach((r) => r.addEventListener('change', atualizar));
+  atualizar();
+}
+
+function origemPedidoSelecionada() {
+  return document.querySelector('input[name="origem_pedido"]:checked')?.value || 'MATRIZ';
 }
 
 function configurarProduto() {
@@ -160,7 +210,7 @@ function configurarProduto() {
   qtdInput.value = PRODUTO.quantidade_minima;
   precoInput.value = PRODUTO.preco_padrao.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
-  qtdInput.addEventListener('input', () => { validarQuantidade(); validarPreco(); recalcularValores(); });
+  qtdInput.addEventListener('input', () => { const qtd = Number(qtdInput.value) || 0; const novoPreco = qtd >= PRODUTO.quantidade_volume ? PRODUTO.preco_volume : PRODUTO.preco_normal; precoInput.value = novoPreco.toLocaleString('pt-BR', { minimumFractionDigits: 2 }); validarQuantidade(); validarPreco(); recalcularValores(); });
   precoInput.addEventListener('input', () => { validarPreco(); recalcularValores(); });
   document.getElementById('cep').addEventListener('input', limparFrete);
 
@@ -168,20 +218,19 @@ function configurarProduto() {
 }
 
 function validarQuantidade() {
-  const qtdInput = document.getElementById('quantidade');
   const aviso = document.getElementById('quantidadeAviso');
-  const invalida = Number(qtdInput.value) < PRODUTO.quantidade_minima;
-  aviso.style.display = invalida ? 'block' : 'none';
-  return !invalida;
+  aviso.style.display = Number(document.getElementById('quantidade').value) < PRODUTO.quantidade_minima ? 'block' : 'none';
+  return true;
 }
 
 function validarPreco() {
-  const precoInput = document.getElementById('preco_unitario');
+  const qtd = Number(document.getElementById('quantidade').value) || 0;
   const aviso = document.getElementById('precoAviso');
-  const preco = moedaParaNumero(precoInput.value) || 0;
-  const invalido = preco < PRODUTO.preco_minimo || preco > PRODUTO.preco_maximo;
-  aviso.style.display = invalido ? 'block' : 'none';
-  return !invalido;
+  aviso.textContent = qtd > 50
+    ? 'Referência: acima de 50 unidades, a sugestão é R$ 49,00 por unidade. O valor pode ser alterado.'
+    : 'Referência: o preço padrão começa em R$ 59,00 por unidade. O valor pode ser alterado.';
+  aviso.style.display = 'block';
+  return true;
 }
 
 function recalcularValores() {
@@ -214,6 +263,10 @@ async function calcularFrete() {
   const status = document.getElementById('freteStatus');
   const opcoesBox = document.getElementById('freteOpcoes');
 
+  if (origemPedidoSelecionada() === 'CONSIGNACAO') {
+    status.textContent = 'Consignação: a entrega é feita pela vendedora no momento da venda. Não há frete da matriz.';
+    return;
+  }
   if (cep.length !== 8) { status.textContent = 'Informe um CEP válido do cliente antes de calcular o frete.'; return; }
 
   const btn = document.getElementById('btnCalcularFrete');
@@ -344,6 +397,10 @@ async function carregarPedidoParaEdicao(id) {
     clienteIdAtual = p.cliente_id;
     statusAtual = p.status;
     const campos = ['nome_empresa','cnpj','inscricao_estadual','nome_socio','telefone','whatsapp','email','cep','endereco','numero','complemento','bairro','cidade','estado','produtos','quantidade','observacoes'];
+    const origem = p.origem_pedido || 'MATRIZ';
+    const origemRadio = document.querySelector(`input[name="origem_pedido"][value="${origem}"]`);
+    if (origemRadio) origemRadio.checked = true;
+    configurarOrigemPedido();
     campos.forEach((c) => { if (document.getElementById(c)) document.getElementById(c).value = p[c] ?? ''; });
     document.getElementById('valor_total').value = Number(p.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
     document.getElementById('valor_frete').value = Number(p.valor_frete || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
@@ -361,10 +418,10 @@ async function carregarPedidoParaEdicao(id) {
 async function salvarPedido(e) {
   e.preventDefault();
 
-  // Quantidade e preço mostram um aviso visual (ver validarQuantidade/validarPreco),
-  // mas não bloqueiam o envio — são apenas sugestões para a vendedora.
-  validarQuantidade();
-  validarPreco();
+  if (!validarQuantidade() || !validarPreco()) {
+    toast('Corrija a quantidade e o preço antes de salvar o pedido.', 'error');
+    return;
+  }
 
   const btn = document.getElementById('btnSalvar');
   btn.disabled = true;
@@ -377,6 +434,7 @@ async function salvarPedido(e) {
     cep: val('cep'), endereco: val('endereco'), numero: val('numero'), complemento: val('complemento'),
     bairro: val('bairro'), cidade: val('cidade'), estado: val('estado'),
     produtos: val('produtos'), quantidade: Number(val('quantidade')),
+    origem_pedido: origemPedidoSelecionada(),
     valor_total: moedaParaNumero(val('valor_total')),
     valor_frete: moedaParaNumero(val('valor_frete')) || 0,
     forma_pagamento: val('forma_pagamento'), observacoes: val('observacoes'),

@@ -81,10 +81,8 @@ function montarShell(paginaAtiva, usuario) {
   if (isAdmin) links.push({ id: 'historico', href: '/historico.html', icon: 'fa-clock-rotate-left', label: 'Histórico' });
   if (isAdmin) links.push({ id: 'usuarios', href: '/usuarios.html', icon: 'fa-users-gear', label: 'Usuários' });
 
-  // onclick="fecharMenuMobile()" fecha o menu ao navegar pelo celular;
-  // no desktop não tem efeito nenhum (a sidebar nunca ganha a classe "open").
   const navHtml = links.map((l) => `
-    <a class="nav-link ${l.id === paginaAtiva ? 'active' : ''}" href="${l.href}" onclick="fecharMenuMobile()">
+    <a class="nav-link ${l.id === paginaAtiva ? 'active' : ''}" href="${l.href}">
       <i class="fa-solid ${l.icon}"></i> ${l.label}
     </a>`).join('');
 
@@ -102,32 +100,21 @@ function montarShell(paginaAtiva, usuario) {
       </div>
       <button class="logout-btn" onclick="logout()"><i class="fa-solid fa-arrow-right-from-bracket"></i> Sair</button>
     </div>
-  </aside>
-  <div class="sidebar-overlay" id="sidebarOverlay" onclick="fecharMenuMobile()"></div>`;
+  </aside>`;
 }
 
 function montarTopbar(titulo, subtitulo) {
   return `
   <div class="topbar">
-    <div style="display:flex; align-items:center;">
-      <button class="icon-btn mobile-menu-btn" id="btnMenu" style="margin-right:10px;" onclick="abrirMenuMobile()"><i class="fa-solid fa-bars"></i></button>
+    <div class="topbar-title">
+      <button class="icon-btn d-mobile-only" id="btnMenu" aria-label="Abrir menu" title="Menu"><i class="fa-solid fa-bars"></i></button>
       <div>
         <h1>${titulo}</h1>
         <div class="subtitle">${subtitulo || ''}</div>
       </div>
     </div>
-    <button class="theme-toggle" onclick="toggleTheme()"><i class="fa-solid fa-circle-half-stroke"></i> Tema</button>
+    <button class="theme-toggle" onclick="toggleTheme()" aria-label="Alternar tema" title="Alternar tema"><i class="fa-solid fa-circle-half-stroke"></i><span> Tema</span></button>
   </div>`;
-}
-
-// ---------- Menu mobile (sidebar em off-canvas abaixo de 860px) ----------
-function abrirMenuMobile() {
-  document.getElementById('sidebar')?.classList.add('open');
-  document.getElementById('sidebarOverlay')?.classList.add('visible');
-}
-function fecharMenuMobile() {
-  document.getElementById('sidebar')?.classList.remove('open');
-  document.getElementById('sidebarOverlay')?.classList.remove('visible');
 }
 
 function aplicarPermissoesUI(usuario) {
@@ -135,3 +122,47 @@ function aplicarPermissoesUI(usuario) {
     document.querySelectorAll('.somente-admin').forEach((el) => el.remove());
   }
 }
+
+
+// ---------- Menu mobile ----------
+(function initMobileMenu() {
+  function fecharMenu() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.querySelector('.mobile-menu-backdrop');
+    if (sidebar) sidebar.classList.remove('open');
+    if (backdrop) backdrop.remove();
+    document.body.classList.remove('menu-open');
+  }
+
+  function abrirMenu() {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    sidebar.classList.add('open');
+
+    if (!document.querySelector('.mobile-menu-backdrop')) {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'mobile-menu-backdrop';
+      backdrop.addEventListener('click', fecharMenu);
+      document.body.appendChild(backdrop);
+    }
+    document.body.classList.add('menu-open');
+  }
+
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('#btnMenu')) {
+      event.preventDefault();
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar && sidebar.classList.contains('open')) fecharMenu();
+      else abrirMenu();
+      return;
+    }
+
+    if (event.target.closest('.sidebar .nav-link')) {
+      fecharMenu();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') fecharMenu();
+  });
+})();

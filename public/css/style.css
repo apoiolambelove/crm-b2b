@@ -153,11 +153,8 @@ a{color:inherit;}
 .ledger-card.stripe-neutral{border-left-color:var(--ink-soft);}
 
 .stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px;}
-/* !important garante a quebra em telas pequenas mesmo quando a página define
-   grid-template-columns inline (ex: dashboard.html e relatorios.html usam
-   style="grid-template-columns:repeat(3,1fr)" direto na tag). */
-@media (max-width:1100px){.stat-grid{grid-template-columns:repeat(2,1fr) !important;}}
-@media (max-width:600px){.stat-grid{grid-template-columns:1fr !important;}}
+@media (max-width:1100px){.stat-grid{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:600px){.stat-grid{grid-template-columns:1fr;}}
 
 /* ---------- Status badges ---------- */
 .badge-status{
@@ -174,9 +171,8 @@ a{color:inherit;}
 [data-theme="dark"] .st-cancelada{background:#2A2A2A; color:#aaa;}
 
 /* ---------- Tables ---------- */
-.table-wrap{background:var(--bg-elevated); border:1px solid var(--line); border-radius:var(--radius); overflow-x:auto; -webkit-overflow-scrolling:touch; box-shadow:var(--shadow);}
+.table-wrap{background:var(--bg-elevated); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow);}
 table{width:100%; border-collapse:collapse; font-size:13.5px;}
-@media (max-width:700px){ table{min-width:640px;} }
 thead th{
   text-align:left; padding:11px 14px; font-size:11px; text-transform:uppercase; letter-spacing:.05em;
   color:var(--ink-soft); border-bottom:1px solid var(--line); background:var(--bg);
@@ -322,28 +318,170 @@ tbody tr:hover{background:var(--primary-soft);}
 }
 .filters-bar .form-control, .filters-bar .form-select{width:auto; min-width:140px;}
 
-/* ---------- Botão de menu mobile e overlay ---------- */
-.mobile-menu-btn{display:none;}
-.sidebar-overlay{
-  display:none; position:fixed; inset:0; background:rgba(15,30,28,.45);
-  z-index:1400; opacity:0; transition:opacity .2s ease;
-}
-.sidebar-overlay.visible{display:block; opacity:1;}
-
 @media (max-width:860px){
-  .mobile-menu-btn{display:inline-flex;}
   .sidebar{position:fixed; left:-230px; top:0; bottom:0; z-index:1500; transition:left .2s ease;}
   .sidebar.open{left:0;}
   .content{padding:18px;}
   .topbar{padding:14px 16px;}
-  .topbar h1{font-size:17px;}
-  .filters-bar .form-control, .filters-bar .form-select{min-width:120px;}
 }
 
-@media (max-width:480px){
-  .content{padding:14px;}
-  .card-body{padding:14px;}
-  .ledger-card{padding:13px 14px;}
-  .ledger-card .value{font-size:20px;}
-  .topbar{padding:12px 14px;}
+/* =========================================================
+   RESPONSIVIDADE MOBILE — CRM B2B
+   ========================================================= */
+html, body { max-width:100%; overflow-x:hidden; }
+img, svg, video, canvas { max-width:100%; }
+button, input, select, textarea { font:inherit; }
+
+.d-mobile-only { display:none !important; }
+
+.table-wrap {
+  width:100%;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
 }
+.table-wrap table { min-width:720px; }
+
+@media (max-width: 860px) {
+  .app-shell { display:block; min-height:100vh; }
+  .sidebar {
+    width:280px;
+    max-width:88vw;
+    left:-300px;
+    padding:16px 0;
+    box-shadow:8px 0 30px rgba(0,0,0,.18);
+  }
+  .sidebar.open { left:0; }
+
+  .mobile-menu-backdrop {
+    position:fixed;
+    inset:0;
+    z-index:1400;
+    background:rgba(0,0,0,.38);
+    backdrop-filter:blur(1px);
+  }
+
+  .main { width:100%; min-width:0; }
+  .topbar {
+    position:sticky;
+    top:0;
+    z-index:1000;
+    min-height:64px;
+    padding:10px 14px;
+    gap:10px;
+  }
+  .topbar-title {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:0;
+    flex:1;
+  }
+  .topbar-title > div:last-child { min-width:0; }
+  .topbar h1 {
+    font-size:18px;
+    line-height:1.15;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .topbar .subtitle {
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:62vw;
+  }
+  .d-mobile-only { display:inline-flex !important; flex:0 0 auto; }
+  .theme-toggle {
+    padding:8px 10px;
+    min-width:42px;
+    min-height:42px;
+    font-size:0;
+  }
+  .theme-toggle i { font-size:15px; }
+
+  .content { padding:16px 12px 28px; }
+  .card-body { padding:15px; }
+
+  .stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .ledger-card { padding:13px 14px; }
+  .ledger-card .value { font-size:20px; }
+
+  .filters-bar {
+    display:grid;
+    grid-template-columns:1fr;
+    gap:9px;
+    padding:12px;
+  }
+  .filters-bar .form-control,
+  .filters-bar .form-select,
+  .filters-bar button {
+    width:100%;
+    min-width:0;
+  }
+
+  .section-head { align-items:stretch; }
+  .section-head > div { width:100%; }
+  .section-head > div button,
+  .section-head > div a { flex:1; justify-content:center; }
+
+  .row.g-3 { margin-left:-5px; margin-right:-5px; }
+  .row.g-3 > [class*="col-"] { padding-left:5px; padding-right:5px; }
+  .form-control, .form-select { min-height:42px; font-size:16px; }
+
+  .product-card {
+    align-items:flex-start;
+    padding:12px;
+  }
+  .product-card img { width:44px; height:44px; }
+  .product-card .product-info { min-width:0; }
+  .product-card .product-suggestion {
+    line-height:1.4;
+  }
+
+  .toast-stack {
+    left:12px;
+    right:12px;
+    top:12px;
+  }
+  .toast-msg { min-width:0; width:100%; }
+
+  /* Tabelas continuam acessíveis sem esmagar colunas. */
+  .table-wrap::after {
+    content:'Deslize para os lados para ver todas as colunas';
+    display:block;
+    padding:7px 12px;
+    font-size:10.5px;
+    color:var(--ink-soft);
+    background:var(--bg);
+    border-top:1px solid var(--line);
+  }
+}
+
+@media (max-width: 600px) {
+  .stat-grid { grid-template-columns:1fr; }
+  .login-card { padding:26px 18px; }
+  .login-logo { width:105px; height:105px; }
+  .content { padding-left:10px; padding-right:10px; }
+
+  .btn-brand, .btn-outline, .btn-danger { min-height:42px; }
+  .section-head > div { flex-wrap:wrap; }
+  .section-head > div button,
+  .section-head > div a { min-width:calc(50% - 4px); }
+
+  .greeting-banner {
+    align-items:flex-start;
+    padding:14px;
+  }
+}
+
+/* Origem do pedido */
+.origem-pedido-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.origem-pedido-card { display:block; cursor:pointer; }
+.origem-pedido-card input { position:absolute; opacity:0; pointer-events:none; }
+.origem-pedido-card > span { display:flex; flex-direction:column; gap:5px; min-height:108px; padding:16px; border:1px solid var(--border,#d9dee7); border-radius:12px; background:var(--card,#fff); transition:.18s ease; }
+.origem-pedido-card > span i { font-size:18px; color:var(--ink-soft); }
+.origem-pedido-card > span strong { font-size:14px; }
+.origem-pedido-card > span small { font-size:12px; color:var(--ink-soft); line-height:1.4; }
+.origem-pedido-card.selected > span { border-color:var(--primary,#0f4c45); box-shadow:0 0 0 2px color-mix(in srgb, var(--primary,#0f4c45) 14%, transparent); }
+.origem-pedido-aviso { display:none; margin-top:9px; padding:10px 12px; border-radius:9px; background:var(--bg-soft,#f4f6f8); color:var(--ink-soft); font-size:12px; line-height:1.45; }
+@media (max-width: 640px) { .origem-pedido-grid { grid-template-columns:1fr; } .origem-pedido-card > span { min-height:0; } }

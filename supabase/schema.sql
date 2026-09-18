@@ -64,6 +64,7 @@ create table if not exists pedidos (
   cliente_id uuid not null references clientes(id),
   produtos text not null,
   quantidade integer not null default 1,
+  origem_pedido text not null default 'MATRIZ' check (origem_pedido in ('MATRIZ','CONSIGNACAO')),
   valor_total numeric(12,2) not null default 0,
   valor_frete numeric(12,2) not null default 0,
   forma_pagamento text not null check (forma_pagamento in ('PIX','BOLETO','CARTAO','DINHEIRO','TRANSFERENCIA','OUTROS')),

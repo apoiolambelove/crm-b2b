@@ -5,27 +5,10 @@ const { PRODUTO } = require('../../public/js/produto.js');
 
 const STATUS_ADMIN_ONLY = ['AGUARDANDO_APROVACAO', 'VENDA_CONCLUIDA', 'PENDENTE_PAGAMENTO', 'NAO_EFETIVADA', 'CANCELADA'];
 const FORMAS_PAGAMENTO_PERMITIDAS = ['PIX', 'TRANSFERENCIA', 'CARTAO'];
+const ORIGENS_PEDIDO = ['MATRIZ', 'CONSIGNACAO'];
 
-// Confere se a quantidade e o valor total batem com a faixa de preço unitário
-// permitida (R$ 49,00 a R$ 89,00 — a vendedora decide o valor exato dentro
-// dessa faixa, sem depender da quantidade do pedido).
-// Retorna uma mensagem de erro (string) se algo estiver fora da regra, ou
-// null se estiver tudo certo.
-function validarQuantidadeEPreco(quantidade, valorTotal) {
-  const qtd = Number(quantidade) || 0;
-  const total = Number(valorTotal) || 0;
-
-  if (qtd < PRODUTO.quantidade_minima) {
-    return `Quantidade mínima é ${PRODUTO.quantidade_minima} unidades.`;
-  }
-
-  const precoUnitario = qtd > 0 ? total / qtd : 0;
-  if (precoUnitario < PRODUTO.preco_minimo || precoUnitario > PRODUTO.preco_maximo) {
-    return `Preço unitário de R$ ${precoUnitario.toFixed(2)} fora da faixa permitida (entre R$ ${PRODUTO.preco_minimo.toFixed(2)} e R$ ${PRODUTO.preco_maximo.toFixed(2)}).`;
-  }
-
-  return null;
-}
+// Referências comerciais são sugestões, não travas.
+// A vendedora pode alterar quantidade e preço conforme cada negociação.
 
 async function registrarHistorico(supabase, usuario, pedidoId, acao, detalhes, ip) {
   await supabase.from('historico').insert({
@@ -123,6 +106,7 @@ exports.handler = async (event) => {
       if (params.numero_pedido) query = query.eq('numero_pedido', params.numero_pedido);
       if (params.status) query = query.eq('status', params.status);
       if (params.forma_pagamento) query = query.eq('forma_pagamento', params.forma_pagamento);
+      if (params.origem_pedido) query = query.eq('origem_pedido', params.origem_pedido);
       if (params.data_inicio) query = query.gte('data_pedido', params.data_inicio);
       if (params.data_fim) query = query.lte('data_pedido', params.data_fim);
 
@@ -146,11 +130,13 @@ exports.handler = async (event) => {
         return fail('Preencha empresa, produtos, valor total e forma de pagamento.', 400);
       }
       if (!FORMAS_PAGAMENTO_PERMITIDAS.includes(body.forma_pagamento)) {
-        return fail('Forma de pagamento inválida. Use PIX ou Transferência.', 400);
+        return fail('Forma de pagamento inválida. Use PIX, Transferência ou Cartão.', 400);
       }
-
-      const erroPreco = validarQuantidadeEPreco(body.quantidade || 1, body.valor_total);
-      if (erroPreco) return fail(erroPreco, 400);
+      const origemPedido = body.origem_pedido || 'MATRIZ';
+      if (!ORIGENS_PEDIDO.includes(origemPedido)) return fail('Origem do pedido inválida.', 400);
+      if (origemPedido === 'CONSIGNACAO' && ehAdmin(usuario)) {
+        return fail('Pedido de consignação deve ser cadastrado pela própria vendedora responsável pelo estoque consignado.', 403);
+      }
 
       const cliente_id = await upsertCliente(supabase, body, usuario);
 
@@ -162,6 +148,7 @@ exports.handler = async (event) => {
           cliente_id,
           produtos: body.produtos,
           quantidade: body.quantidade || 1,
+          origem_pedido: origemPedido,
           valor_total: body.valor_total,
           valor_frete: body.valor_frete || 0,
           forma_pagamento: body.forma_pagamento,
@@ -199,21 +186,20 @@ exports.handler = async (event) => {
       }
 
       if (body.forma_pagamento !== undefined && !FORMAS_PAGAMENTO_PERMITIDAS.includes(body.forma_pagamento)) {
-        return fail('Forma de pagamento inválida. Use PIX ou Transferência.', 400);
+        return fail('Forma de pagamento inválida. Use PIX, Transferência ou Cartão.', 400);
       }
-
-      if (body.quantidade !== undefined || body.valor_total !== undefined) {
-        const quantidadeFinal = body.quantidade !== undefined ? body.quantidade : atual.quantidade;
-        const valorTotalFinal = body.valor_total !== undefined ? body.valor_total : atual.valor_total;
-        const erroPreco = validarQuantidadeEPreco(quantidadeFinal, valorTotalFinal);
-        if (erroPreco) return fail(erroPreco, 400);
+      if (body.origem_pedido !== undefined && !ORIGENS_PEDIDO.includes(body.origem_pedido)) {
+        return fail('Origem do pedido inválida.', 400);
+      }
+      if (body.origem_pedido === 'CONSIGNACAO' && ehAdmin(usuario)) {
+        return fail('Pedido de consignação deve ser cadastrado pela própria vendedora responsável pelo estoque consignado.', 403);
       }
 
       if (body.nome_empresa) {
         await upsertCliente(supabase, { ...body, cliente_id: atual.cliente_id }, usuario);
       }
 
-      const camposEditaveis = ['data_pedido', 'hora_pedido', 'produtos', 'quantidade', 'valor_total', 'valor_frete', 'forma_pagamento', 'observacoes'];
+      const camposEditaveis = ['data_pedido', 'hora_pedido', 'produtos', 'quantidade', 'origem_pedido', 'valor_total', 'valor_frete', 'forma_pagamento', 'observacoes'];
       const updateData = {};
       camposEditaveis.forEach((campo) => {
         if (body[campo] !== undefined) updateData[campo] = body[campo];

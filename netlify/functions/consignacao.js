@@ -64,8 +64,8 @@ exports.handler = async (event) => {
       // Pedidos "Venda Concluída" ainda não incluídos em nenhum repasse, agrupados por vendedora.
       // Serve tanto para o Admin decidir o que fechar quanto para a vendedora ver o que está pendente.
       if (params.pendentes) {
-        let query = supabase.from('vw_pedidos').select('id, numero_pedido, data_pedido, nome_empresa, valor_total, valor_comissao, criado_por')
-          .eq('status', 'VENDA_CONCLUIDA').is('repasse_consignacao_id', null);
+        let query = supabase.from('vw_pedidos').select('id, numero_pedido, data_pedido, nome_empresa, valor_total, valor_comissao, criado_por, origem_pedido')
+          .eq('status', 'VENDA_CONCLUIDA').eq('origem_pedido', 'CONSIGNACAO').is('repasse_consignacao_id', null);
         if (!ehAdmin(usuario)) query = query.eq('criado_por', usuario.id);
         else if (params.vendedora_id) query = query.eq('criado_por', params.vendedora_id);
         const { data: pedidos, error } = await query.order('data_pedido', { ascending: true });
@@ -160,9 +160,10 @@ exports.handler = async (event) => {
         }
 
         const { data: pedidosElegiveis, error: e1 } = await supabase.from('pedidos')
-          .select('id, valor_total, valor_comissao, status, repasse_consignacao_id')
+          .select('id, valor_total, valor_comissao, status, repasse_consignacao_id, origem_pedido')
           .eq('criado_por', vendedora_id)
           .eq('status', 'VENDA_CONCLUIDA')
+          .eq('origem_pedido', 'CONSIGNACAO')
           .is('repasse_consignacao_id', null)
           .gte('data_pedido', periodo_inicio)
           .lte('data_pedido', periodo_fim);

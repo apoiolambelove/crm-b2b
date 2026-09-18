@@ -6,56 +6,6 @@
 <title>Entrar · LambeLove</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="/css/style.css">
-<style>
-  * { box-sizing: border-box; }
-
-  html, body {
-    width: 100%;
-    overflow-x: hidden;
-  }
-
-  .login-shell {
-    width: 100%;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-
-  .login-card {
-    width: 100%;
-    max-width: 400px;
-  }
-
-  .login-card .form-control {
-    width: 100%;
-    font-size: 16px; /* evita zoom automático no iOS ao focar o campo */
-  }
-
-  .login-card #btnEntrar {
-    width: 100%;
-    min-height: 44px;
-  }
-
-  @media (max-width: 480px) {
-    .login-shell {
-      padding: 12px;
-    }
-
-    .login-card {
-      padding: 28px 18px;
-    }
-
-    .login-card h1 {
-      font-size: 22px;
-    }
-
-    .login-card .lead {
-      font-size: 13px;
-    }
-  }
-</style>
 </head>
 <body>
 <div class="login-shell">
@@ -77,18 +27,27 @@
         <i class="fa-solid fa-right-to-bracket"></i> Entrar
       </button>
     </form>
+    <p style="font-size:11.5px; color:var(--ink-soft); margin-top:18px; text-align:center;">
+      Os usuários iniciais são criados automaticamente no primeiro acesso, com senha criptografada (BCrypt).
+    </p>
   </div>
 </div>
 
 <script src="/js/api.js"></script>
 <script src="/js/ui.js"></script>
 <script>
-  // Se já está logado, vai direto pro dashboard
+  // Se já está logado
   const token = getToken();
   const usuario = getUsuario();
-
+  
   if (token && usuario) {
-    window.location.href = '/dashboard.html';
+    // Se precisa alterar a senha no primeiro acesso, vai pra página de troca
+    if (usuario.primeira_vez_login === true) {
+      window.location.href = '/change-password.html';
+    } else {
+      // Caso contrário, vai pro dashboard
+      window.location.href = '/dashboard.html';
+    }
   }
 
   document.getElementById('formLogin').addEventListener('submit', async (e) => {
@@ -107,10 +66,16 @@
           senha: document.getElementById('senha').value,
         },
       });
-
+      
       localStorage.setItem('crm_token', data.token);
       localStorage.setItem('crm_usuario', JSON.stringify(data.usuario));
-      window.location.href = '/dashboard.html';
+      
+      // Se precisa alterar a senha, redireciona pra página de troca
+      if (data.precisa_alterar_senha === true) {
+        window.location.href = '/change-password.html';
+      } else {
+        window.location.href = '/dashboard.html';
+      }
     } catch (err) {
       erroBox.textContent = err.message || 'Usuário ou senha inválidos.';
       erroBox.style.display = 'block';
